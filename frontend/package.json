@@ -17,6 +17,9 @@
   "devDependencies": {
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "typescript": "^5.0.0",
+    "tailwindcss": "^3.3.0",
+    "daisyui": "^4.0.0"
   }
 }

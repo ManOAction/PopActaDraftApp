@@ -73,16 +73,20 @@ PopActaDraftApp/
 ├── backend/                # FastAPI backend
 │   ├── app/                # FastAPI application code
 │   │   └── __init__.py
+│   │   └── main.py
 │   ├── requirements.txt    # Python dependencies
 │   └── Dockerfile          # Backend Dockerfile
 ├── frontend/               # React frontend (with Bun, Tailwind CSS, DaisyUI)
+│   ├── dist/
 │   ├── src/
 │   ├── public/
-│   ├── bun.lockb
+│   ├── build.ts
+│   ├── build-env.d.ts
+│   ├── bunfig.toml
 │   ├── package.json
-│   └── Dockerfile          # Frontend Dockerfile
 ├── nginx/                  # Nginx configuration
 │   └── nginx.conf
+│   └── Dockerfile
 ├── docker-compose.yml      # Docker Compose orchestration
 ├── README.md
 └── feature-roadmap.md

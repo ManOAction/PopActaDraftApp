@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 import plugin from "bun-plugin-tailwind";
-import { existsSync } from "fs";
+import { existsSync, cpSync, readFileSync, writeFileSync } from "fs";
 import { rm } from "fs/promises";
 import path from "path";
 
 if (process.argv.includes("--help") || process.argv.includes("-h")) {
   console.log(`
-🏗️  Bun Build Script
+🏗️  Bun Build Script for React
 
 Usage: bun run build.ts [options]
 
@@ -105,7 +105,7 @@ const formatFileSize = (bytes: number): string => {
   return `${size.toFixed(2)} ${units[unitIndex]}`;
 };
 
-console.log("\n🚀 Starting build process...\n");
+console.log("\n🚀 Starting React build process...\n");
 
 const cliConfig = parseArgs();
 const outdir = cliConfig.outdir || path.join(process.cwd(), "dist");
@@ -117,23 +117,72 @@ if (existsSync(outdir)) {
 
 const start = performance.now();
 
-const entrypoints = [...new Bun.Glob("**.html").scanSync("src")]
-  .map(a => path.resolve("src", a))
-  .filter(dir => !dir.includes("node_modules"));
-console.log(`📄 Found ${entrypoints.length} HTML ${entrypoints.length === 1 ? "file" : "files"} to process\n`);
+// React entry point instead of HTML scanning
+const entrypoint = path.resolve("src", "main.tsx");
+if (!existsSync(entrypoint)) {
+  console.error("❌ Entry point not found: src/main.tsx");
+  process.exit(1);
+}
+
+console.log(`📦 Building React app from ${path.relative(process.cwd(), entrypoint)}\n`);
 
 const result = await Bun.build({
-  entrypoints,
+  entrypoints: [entrypoint],
   outdir,
   plugins: [plugin],
-  minify: true,
+  minify: process.env.NODE_ENV === "production" || cliConfig.minify || false,
   target: "browser",
-  sourcemap: "linked",
+  format: "esm",
+  splitting: true,
+  sourcemap: process.env.NODE_ENV !== "production" ? "external" : "none",
   define: {
-    "process.env.NODE_ENV": JSON.stringify("production"),
+    "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "production"),
   },
   ...cliConfig,
 });
+
+if (!result.success) {
+  console.error("❌ Build failed:");
+  for (const message of result.logs) {
+    console.error(message);
+  }
+  process.exit(1);
+}
+
+// Copy public directory to dist
+const publicDir = path.resolve("public");
+if (existsSync(publicDir)) {
+  console.log("📁 Copying public files...");
+  cpSync(publicDir, outdir, { recursive: true });
+} else {
+  console.warn("⚠️  No public directory found to copy");
+}
+
+// Update HTML file to reference built JS
+const htmlPath = path.join(outdir, "index.html");
+if (existsSync(htmlPath)) {
+  console.log("🔗 Updating HTML references...");
+  let html = readFileSync(htmlPath, "utf-8");
+
+  // Find the main JS file in the build output
+  const mainJsFile = result.outputs.find(output =>
+    output.path.includes("main") && output.path.endsWith(".js")
+  );
+
+  if (mainJsFile) {
+    const jsFileName = path.basename(mainJsFile.path);
+    html = html.replace(
+      '<script type="module" src="/src/main.tsx"></script>',
+      `<script type="module" src="/${jsFileName}"></script>`
+    );
+    writeFileSync(htmlPath, html);
+    console.log(`✅ Updated HTML to reference /${jsFileName}`);
+  } else {
+    console.warn("⚠️  Could not find main JS file to update HTML reference");
+  }
+} else {
+  console.warn("⚠️  No index.html found in output directory");
+}
 
 const end = performance.now();
 
@@ -146,4 +195,4 @@ const outputTable = result.outputs.map(output => ({
 console.table(outputTable);
 const buildTime = (end - start).toFixed(2);
 
-console.log(`\n✅ Build completed in ${buildTime}ms\n`);
+console.log(`\n✅ React build completed in ${buildTime}ms\n`);
