@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+.env
+.venv/
+venv/
+env/
+
+# Node/Bun/React
+frontend/node_modules/
+frontend/bun.lockb
+frontend/dist/
+frontend/.next/
+frontend/.env
+frontend/.DS_Store
+
+# Bun cache
+.bun/
+
+# Docker
+**/Dockerfile~
+**/docker-compose.yml~
+certbot/
+*.pid
+
+# Nginx
+nginx/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
