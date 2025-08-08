@@ -10,12 +10,26 @@ __pycache__/
 venv/
 env/
 
-# Node/Bun/React
+# Node/Bun/React/Frontend
 frontend/node_modules/
 frontend/bun.lockb
 frontend/dist/
-frontend/.next/
+frontend/out/
+frontend/*.tgz
+frontend/coverage
+frontend/*.lcov
+frontend/logs
+frontend/*.log
+frontend/report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 frontend/.env
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/.env.local
+frontend/.eslintcache
+frontend/.cache
+frontend/*.tsbuildinfo
+frontend/.idea
 frontend/.DS_Store
 
 # Bun cache
