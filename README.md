@@ -70,12 +70,18 @@ docker-compose up --build
 
 ```
 PopActaDraftApp/
-├── backend/                # FastAPI backend
-│   ├── app/                # FastAPI application code
-│   │   └── __init__.py
-│   │   └── main.py
-│   ├── requirements.txt    # Python dependencies
-│   └── Dockerfile          # Backend Dockerfile
+backend/
+├── app/
+│   ├── __init__.py
+│   ├── database.py          # Database connection and session management
+│   └── init_db.py           # Database initialization script
+│   ├── main.py
+│   ├── models.py            # SQLAlchemy models
+├── data/
+│   └── app.db               # SQLite database file (created automatically)
+├── migrations/              # Optional: for future schema changes
+└── Dockerfile          # Backend Dockerfile
+└── requirements.txt
 ├── frontend/               # React frontend (with Bun, Tailwind CSS, DaisyUI)
 │   ├── dist/
 │   ├── node_modules/

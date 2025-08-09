@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 sqlite-utils
 python-dotenv
+sqlalchemy
+alembic

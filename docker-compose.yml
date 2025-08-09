@@ -5,16 +5,18 @@ services:
     restart: always
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=sqlite:////app/data/app.db
     volumes:
       - ./backend/app:/app/app
+      - ./backend/data:/app/data
       - ./backend/requirements.txt:/app/requirements.txt
     expose:
       - 8000
-
   nginx:
     build:
       context: .  # Root context so nginx can access frontend folder
-      dockerfile: nginx/Dockerfile  # Specify where the Dockerfile is
+      dockerfile: nginx/Dockerfile # Specify the Dockerfile for nginx
     container_name: nginx
     restart: always
     ports:
@@ -25,3 +27,4 @@ services:
       - ./certbot/www:/var/www/certbot
     depends_on:
       - backend
+
