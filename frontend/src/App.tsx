@@ -13,29 +13,34 @@ function App() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Fetching from /api/hello...');
 
       const response = await fetch('/api/hello');
+      console.log('Response status:', response.status);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data: ApiResponse = await response.json();
+      console.log('Data received:', data);
       setMessage(data.message);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       console.error('Error fetching message:', err);
     } finally {
       setLoading(false);
+      console.log('Fetch complete. State:', { loading: false, message, error });
     }
   };
 
+  // Add useEffect to call fetchMessage on mount
   useEffect(() => {
     fetchMessage();
   }, []);
 
   return (
-    <div className="min-h-screen bg-base-200">
+    <div className="bg-base-200">
       {/* Navigation */}
       <div className="navbar bg-base-100 shadow-lg">
         <div className="flex-1">
@@ -48,7 +53,11 @@ function App() {
         <div className="max-w-md mx-auto">
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
-              <h2 className="card-title justify-center">Backend Message</h2>
+              <h2 className="card-title justify-center">Backend Message:</h2>
+              <p className="text-center text-lg">{message || 'No message yet.'}</p>
+
+              {/* Conditional Rendering for Loading, Error, and Success States */}
+              <div className="divider"></div>
 
               {/* Loading State */}
               {loading && (

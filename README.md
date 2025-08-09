@@ -78,8 +78,13 @@ PopActaDraftApp/
 │   └── Dockerfile          # Backend Dockerfile
 ├── frontend/               # React frontend (with Bun, Tailwind CSS, DaisyUI)
 │   ├── dist/
-│   ├── src/
+│   ├── node_modules/
 │   ├── public/
+│   │   └── index.html
+│   ├── src/
+│   │   └── App.tsx
+│   │   └── index.css
+│   │   └── main.tsx
 │   ├── build.ts
 │   ├── build-env.d.ts
 │   ├── bunfig.toml
