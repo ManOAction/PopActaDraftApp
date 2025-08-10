@@ -6,6 +6,10 @@ type DraftSettings = {
     rounds: number;
     current_pick: number;
     is_active: boolean;
+    qb_slots: number;
+    rb_slots: number;
+    wr_slots: number;
+    flex_slots: number;
 };
 
 type ResetResult = {
@@ -17,6 +21,11 @@ export default function Settings() {
     const [settings, setSettings] = useState<DraftSettings | null>(null);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
+
+    // Edit form state
+    const [saving, setSaving] = useState(false);
+    const [saveErr, setSaveErr] = useState<string | null>(null);
+    const [saveOk, setSaveOk] = useState<string | null>(null);
 
     // Upload modal state
     const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -31,6 +40,7 @@ export default function Settings() {
     const [resetErr, setResetErr] = useState<string | null>(null);
     const [resetCount, setResetCount] = useState<number | null>(null);
 
+    // Load settings
     useEffect(() => {
         (async () => {
             try {
@@ -38,7 +48,15 @@ export default function Settings() {
                 setErr(null);
                 const r = await fetch("/api/draft-settings");
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                setSettings(await r.json());
+                const data = await r.json();
+                // ensure defaults if backend is adding columns on the fly
+                setSettings({
+                    qb_slots: 1,
+                    rb_slots: 2,
+                    wr_slots: 2,
+                    flex_slots: 1,
+                    ...data,
+                });
             } catch (e: any) {
                 setErr(e?.message || "Failed to load settings");
             } finally {
@@ -46,6 +64,53 @@ export default function Settings() {
             }
         })();
     }, []);
+
+    // Helpers
+    const setField = <K extends keyof DraftSettings>(key: K, val: DraftSettings[K]) => {
+        setSettings((s) => (s ? { ...s, [key]: val } : s));
+    };
+
+    const parseIntClamp = (v: string, min: number, max: number) => {
+        const n = Number.parseInt(v, 10);
+        if (Number.isNaN(n)) return min;
+        return Math.min(max, Math.max(min, n));
+    };
+
+    // Save settings (PATCH /api/draft-settings)
+    const onSaveSettings = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!settings) return;
+        setSaveErr(null);
+        setSaveOk(null);
+        try {
+            setSaving(true);
+            const r = await fetch("/api/draft-settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    total_teams: settings.total_teams,
+                    rounds: settings.rounds,
+                    current_pick: settings.current_pick,
+                    is_active: settings.is_active,
+                    qb_slots: settings.qb_slots,
+                    rb_slots: settings.rb_slots,
+                    wr_slots: settings.wr_slots,
+                    flex_slots: settings.flex_slots,
+                }),
+            });
+            const data = await r.json().catch(() => null);
+            if (!r.ok) {
+                const detail = (data && (data.detail || JSON.stringify(data))) || `Save failed (HTTP ${r.status})`;
+                throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+            }
+            setSettings(data);
+            setSaveOk("Settings saved");
+        } catch (e: any) {
+            setSaveErr(e?.message || "Failed to save settings");
+        } finally {
+            setSaving(false);
+        }
+    };
 
     // Upload CSV modal controls
     const openModal = () => {
@@ -73,10 +138,8 @@ export default function Settings() {
             setUploadErr("Please choose a CSV file first.");
             return;
         }
-
         const form = new FormData();
         form.append("file", file);
-
         try {
             setUploading(true);
             const r = await fetch("/api/reset-players", { method: "POST", body: form });
@@ -101,7 +164,7 @@ export default function Settings() {
         setResetCount(null);
         try {
             setResetting(true);
-            const r = await fetch("/api/reset-drafted-status", { method: "POST" });
+            const r = await fetch("/api/players/reset-drafted-status", { method: "POST" });
             const data = await r.json().catch(() => null);
             if (!r.ok) {
                 const detail =
@@ -117,21 +180,121 @@ export default function Settings() {
         }
     };
 
+    const startersSummary = (() => {
+        if (!settings) return "";
+        const t = settings.total_teams;
+        const qb = t * settings.qb_slots;
+        const rb = t * settings.rb_slots;
+        const wr = t * settings.wr_slots;
+        const flex = t * settings.flex_slots;
+        return `League starters → QB ${qb}, RB ${rb}, WR ${wr}, FLEX ${flex}`;
+    })();
+
     return (
         <div className="max-w-5xl mx-auto p-4 space-y-6">
-            {/* Settings summary */}
+            {/* Draft Settings (editable) */}
             <div className="card bg-base-100 shadow">
                 <div className="card-body">
-                    <h2 className="card-title">Settings</h2>
+                    <h2 className="card-title">Draft Settings</h2>
                     {loading && <span className="loading loading-spinner" />}
                     {err && <div className="alert alert-error"><span>{err}</span></div>}
+
                     {!loading && !err && settings && (
-                        <ul className="list-disc pl-6">
-                            <li>Total teams: {settings.total_teams}</li>
-                            <li>Rounds: {settings.rounds}</li>
-                            <li>Current pick: {settings.current_pick}</li>
-                            <li>Active: {settings.is_active ? "Yes" : "No"}</li>
-                        </ul>
+                        <form className="space-y-4" onSubmit={onSaveSettings}>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label className="form-control">
+                                    <span className="label-text">Total Teams</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.total_teams}
+                                        onChange={(e) => setField("total_teams", parseIntClamp(e.target.value, 1, 24))}
+                                    />
+                                </label>
+
+                                <label className="form-control">
+                                    <span className="label-text">Rounds</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.rounds}
+                                        onChange={(e) => setField("rounds", parseIntClamp(e.target.value, 1, 40))}
+                                    />
+                                </label>
+
+                                <label className="form-control">
+                                    <span className="label-text">Current Pick</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.current_pick}
+                                        onChange={(e) => setField("current_pick", Math.max(1, parseIntClamp(e.target.value, 1, 999)))}
+                                    />
+                                </label>
+
+                                <label className="label cursor-pointer gap-3">
+                                    <span className="label-text">Draft Active?</span>
+                                    <input
+                                        type="checkbox"
+                                        className="toggle"
+                                        checked={settings.is_active}
+                                        onChange={(e) => setField("is_active", e.target.checked)}
+                                    />
+                                </label>
+                            </div>
+
+                            <div className="divider">Roster Slots (per team)</div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <label className="form-control">
+                                    <span className="label-text">QB Slots</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.qb_slots}
+                                        onChange={(e) => setField("qb_slots", parseIntClamp(e.target.value, 0, 3))}
+                                    />
+                                </label>
+                                <label className="form-control">
+                                    <span className="label-text">RB Slots</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.rb_slots}
+                                        onChange={(e) => setField("rb_slots", parseIntClamp(e.target.value, 0, 6))}
+                                    />
+                                </label>
+                                <label className="form-control">
+                                    <span className="label-text">WR Slots</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.wr_slots}
+                                        onChange={(e) => setField("wr_slots", parseIntClamp(e.target.value, 0, 6))}
+                                    />
+                                </label>
+                                <label className="form-control">
+                                    <span className="label-text">FLEX Slots</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.flex_slots}
+                                        onChange={(e) => setField("flex_slots", parseIntClamp(e.target.value, 0, 3))}
+                                    />
+                                </label>
+                            </div>
+
+                            <p className="text-sm opacity-70">{startersSummary}</p>
+
+                            {saveErr && <div className="alert alert-error"><span>{saveErr}</span></div>}
+                            {saveOk && <div className="alert alert-success"><span>{saveOk}</span></div>}
+
+                            <div className="mt-2">
+                                <button className="btn btn-primary" type="submit" disabled={saving}>
+                                    {saving ? <span className="loading loading-spinner" /> : "Save Settings"}
+                                </button>
+                            </div>
+                        </form>
                     )}
                 </div>
             </div>

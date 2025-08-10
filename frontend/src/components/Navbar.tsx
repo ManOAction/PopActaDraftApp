@@ -11,6 +11,7 @@ export default function Navbar() {
             </div>
             <div className="flex-none gap-2">
                 <NavLink to="/" className={linkClass}>Home</NavLink>
+                <NavLink to="/draft" className={linkClass}>Draft</NavLink>
                 <NavLink to="/players" className={linkClass}>Players</NavLink>
                 <NavLink to="/settings" className={linkClass}>Settings</NavLink>
             </div>

@@ -1,6 +1,5 @@
 # app/models.py
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, UniqueConstraint
-from sqlalchemy.sql import func
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, UniqueConstraint, func
 
 from .database import Base
 
@@ -49,6 +48,12 @@ class DraftSettings(Base):
     rounds = Column(Integer, default=16)
     current_pick = Column(Integer, default=1)
     is_active = Column(Boolean, default=False)
+
+    # New: per-team roster slots
+    qb_slots = Column(Integer, default=1)
+    rb_slots = Column(Integer, default=2)
+    wr_slots = Column(Integer, default=2)
+    flex_slots = Column(Integer, default=1)  # RB/WR
 
 
 class WelcomeMessage(Base):

@@ -72,6 +72,8 @@ docker-compose up --build
 PopActaDraftApp/
 backend/
 ├── app/
+│   ├── services/
+│   |   ├── player_import.py
 │   ├── __init__.py
 │   ├── database.py          # Database connection and session management
 │   └── init_db.py           # Database initialization script
@@ -80,9 +82,9 @@ backend/
 ├── data/
 │   └── app.db               # SQLite database file (created automatically)
 ├── migrations/              # Optional: for future schema changes
-└── Dockerfile          # Backend Dockerfile
+└── Dockerfile               # Backend Dockerfile
 └── requirements.txt
-├── frontend/               # React frontend (with Bun, Tailwind CSS, DaisyUI)
+├── frontend/                # React frontend (with Bun, Tailwind CSS, DaisyUI)
 │   ├── dist/
 │   ├── node_modules/
 │   ├── public/
@@ -90,6 +92,7 @@ backend/
 │   ├── src/
 │   |   ├── components/
 │   │   |       └── Navbar.tsx
+│   │   |       └── SearchModal.tsx
 │   │   |       └── WelcomeStrip.tsx
 │   |   ├── pages/
 │   │   |       └── Draft.tsx

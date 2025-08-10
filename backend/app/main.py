@@ -1,8 +1,9 @@
 # app/main.py
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile, status
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Path, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,18 @@ from .database import get_db
 from .init_db import init_database
 from .models import DraftSettings, Player, WelcomeMessage
 from .services.player_import import CSVValidationError, parse_players_csv, replace_players_transactionally
+from .services.vorp import compute_vorp_drop
+
+
+class DraftSettingsUpdate(BaseModel):
+    total_teams: int | None = Field(None, ge=1, le=24)
+    rounds: int | None = Field(None, ge=1, le=40)
+    current_pick: int | None = Field(None, ge=1)
+    is_active: bool | None = None
+    qb_slots: int | None = Field(None, ge=0, le=3)
+    rb_slots: int | None = Field(None, ge=0, le=6)
+    wr_slots: int | None = Field(None, ge=0, le=6)
+    flex_slots: int | None = Field(None, ge=0, le=3)
 
 
 @asynccontextmanager
@@ -96,3 +109,61 @@ async def reset_drafted_status(db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to reset drafted status: {e}")
 
     return {"message": "Player draft status reset successfully"}
+
+
+@app.patch("/api/players/{player_id}")
+def update_player(
+    player_id: int = Path(...),
+    payload: dict = Body(...),
+    db: Session = Depends(get_db),
+):
+    p = db.query(Player).filter(Player.id == player_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    # Only allow known fields
+    for key in ["name", "team", "position", "projected_points", "bye_week", "drafted_status", "target_status"]:
+        if key in payload:
+            setattr(p, key, payload[key])
+
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.post("/api/players/{player_id}/toggle-drafted")
+def toggle_drafted(player_id: int, db: Session = Depends(get_db)):
+    p = db.query(Player).filter(Player.id == player_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Player not found")
+    new_status = not bool(p.drafted_status)
+    p.drafted_status = new_status
+    db.commit()
+    db.refresh(p)
+
+    # Optional: record pick/undo pick in DraftPick table here
+    # if new_status: create DraftPick(...)
+    # else: delete the latest pick for this player
+
+    return {"player": p}
+
+
+@app.patch("/api/draft-settings")
+def patch_draft_settings(payload: DraftSettingsUpdate, db: Session = Depends(get_db)):
+    s = db.query(DraftSettings).first()
+    if not s:
+        s = DraftSettings()
+        db.add(s)
+        db.flush()
+    for f, v in payload.model_dump(exclude_unset=True).items():
+        setattr(s, f, v)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@app.get("/api/vorp-drop")
+def get_vorp_drop(db: Session = Depends(get_db), k: int = 6):
+    """Returns { player_id: drop } for positions where starters remain."""
+    drops = compute_vorp_drop(db, k=k)
+    return drops
