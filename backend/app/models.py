@@ -15,6 +15,8 @@ class Player(Base):
     team = Column(String)
     projected_points = Column(Float)
     bye_week = Column(Integer)
+    drafted_status = Column(Boolean, default=False)
+    target_status = Column(String, default="default")  # default, target, avoid
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -29,6 +31,16 @@ class DraftPick(Base):
     drafted_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class DraftStatus(Base):
+    __tablename__ = "draft_status"
+
+    id = Column(Integer, primary_key=True, index=True)
+    picks_remaining = Column(Integer, default=0)
+    qb_remaining = Column(Integer, default=0)
+    rb_remaining = Column(Integer, default=0)
+    current_pick = Column(Integer, default=1)
+
+
 class DraftSettings(Base):
     __tablename__ = "draft_settings"
 
@@ -39,7 +51,7 @@ class DraftSettings(Base):
     is_active = Column(Boolean, default=False)
 
 
-class WelcomeMessages(Base):
+class WelcomeMessage(Base):
     __tablename__ = "welcome_messages"
 
     id = Column(Integer, primary_key=True, index=True)

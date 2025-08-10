@@ -88,6 +88,14 @@ backend/
 │   ├── public/
 │   │   └── index.html
 │   ├── src/
+│   |   ├── components/
+│   │   |       └── Navbar.tsx
+│   │   |       └── WelcomeStrip.tsx
+│   |   ├── pages/
+│   │   |       └── Draft.tsx
+│   │   |       └── Home.tsx
+│   │   |       └── Players.tsx
+│   │   |       └── Settings.tsx
 │   │   └── App.tsx
 │   │   └── index.css
 │   │   └── main.tsx
@@ -95,6 +103,7 @@ backend/
 │   ├── build-env.d.ts
 │   ├── bunfig.toml
 │   ├── package.json
+│   ├── tailwind.config.js
 ├── nginx/                  # Nginx configuration
 │   └── nginx.conf
 │   └── Dockerfile

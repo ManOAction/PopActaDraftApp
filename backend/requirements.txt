@@ -4,3 +4,4 @@ sqlite-utils
 python-dotenv
 sqlalchemy
 alembic
+python-multipart

@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy.exc import IntegrityError
 
 from .database import Base, SessionLocal, engine
-from .models import DraftSettings, Player
+from .models import DraftSettings, Player, WelcomeMessage
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,11 +41,19 @@ def seed_default_data():
         Player(name="San Francisco 49ers", position="DST", team="SF", projected_points=125.8, bye_week=9),
     ]
 
+    sample_messages = [
+        WelcomeMessage(message="Welcome to PopActaDraftApp!"),
+        WelcomeMessage(message="Get ready for the draft!"),
+        WelcomeMessage(message="May your picks be ever in your favor!"),
+    ]
+
     with SessionLocal() as db, db.begin():
         # Seed once on fresh DB
         db.add(DraftSettings(total_teams=12, rounds=16, current_pick=1, is_active=False))
         for p in sample_players:
             db.add(p)
+        for m in sample_messages:
+            db.add(m)
 
     logger.info("Default data seeded successfully.")
 

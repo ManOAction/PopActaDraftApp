@@ -4,4 +4,7 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "tailwindcss";
+@plugin "daisyui";
+
 /* Custom styles can go here */

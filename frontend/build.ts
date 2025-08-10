@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-import plugin from "bun-plugin-tailwind";
 import { existsSync, cpSync, readFileSync, writeFileSync } from "fs";
 import { rm } from "fs/promises";
 import path from "path";
@@ -129,7 +128,6 @@ console.log(`📦 Building React app from ${path.relative(process.cwd(), entrypo
 const result = await Bun.build({
   entrypoints: [entrypoint],
   outdir,
-  plugins: [plugin],
   minify: process.env.NODE_ENV === "production" || cliConfig.minify || false,
   target: "browser",
   format: "esm",
