@@ -134,9 +134,13 @@ export default function Draft() {
         () => [...players.filter(p => p.position === "WR")].sort((a, b) => b.projected_points - a.projected_points),
         [players]
     );
+    const tesAll = useMemo(
+        () => [...players.filter(p => p.position === "TE")].sort((a, b) => b.projected_points - a.projected_points),
+        [players]
+    );
     const flexAll = useMemo(
         () =>
-            [...players.filter(p => p.position === "RB" || p.position === "WR")].sort(
+            [...players.filter(p => p.position === "RB" || p.position === "WR" || p.position === "TE" || p.position === "QB")].sort(
                 (a, b) => b.projected_points - a.projected_points
             ),
         [players]
@@ -146,6 +150,7 @@ export default function Draft() {
     const qbs = useMemo(() => applyDraftVisibilityRule(qbsAll), [qbsAll]);
     const rbs = useMemo(() => applyDraftVisibilityRule(rbsAll), [rbsAll]);
     const wrs = useMemo(() => applyDraftVisibilityRule(wrsAll), [wrsAll]);
+    const tes = useMemo(() => applyDraftVisibilityRule(tesAll), [tesAll]);
     const flex = useMemo(() => applyDraftVisibilityRule(flexAll), [flexAll]);
 
     // Toggle drafted on click
@@ -287,7 +292,8 @@ export default function Draft() {
                     <Column title="QB" items={qbs} />
                     <Column title="RB" items={rbs} />
                     <Column title="WR" items={wrs} />
-                    <Column title="FLEX (RB/WR)" items={flex} />
+                    <Column title="TE" items={tes} />
+                    <Column title="FLEX (RB/WR/TE/QB)" items={flex} />
                 </div>
             )}
 

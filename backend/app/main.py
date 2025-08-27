@@ -13,16 +13,33 @@ from .models import DraftSettings, Player, WelcomeMessage
 from .services.player_import import CSVValidationError, parse_players_csv, replace_players_transactionally
 from .services.vorp import compute_vorp_drop
 
+# ---- Pydantic payloads ----
+
 
 class DraftSettingsUpdate(BaseModel):
     total_teams: int | None = Field(None, ge=1, le=24)
     rounds: int | None = Field(None, ge=1, le=40)
-    current_pick: int | None = Field(None, ge=1)
-    is_active: bool | None = None
+    current_pick: int | None = Field(None, ge=1)  # optional convenience field; you may remove later
     qb_slots: int | None = Field(None, ge=0, le=3)
     rb_slots: int | None = Field(None, ge=0, le=6)
     wr_slots: int | None = Field(None, ge=0, le=6)
     flex_slots: int | None = Field(None, ge=0, le=3)
+    # NOTE: no is_active, no competing teams
+
+
+class PlayerUpdate(BaseModel):
+    # Allow editing core fields + targeting + predictions; not the draft assignment directly
+    name: str | None = None
+    team: str | None = None
+    position: str | None = None
+    projected_points: float | None = None
+    bye_week: int | None = None
+    target_status: str | None = None  # "default" | "target" | "avoid"
+    predicted_pick_number: int | None = None
+    # actual_pick_number is controlled via the toggle endpoint (to keep uniqueness consistent)
+
+
+# ---- App bootstrap ----
 
 
 @asynccontextmanager
@@ -42,6 +59,9 @@ app.add_middleware(
 )
 
 
+# ---- Basic/utility routes ----
+
+
 @app.get("/")
 async def root():
     return {"message": "PopActaDraftApp API is running"}
@@ -52,14 +72,15 @@ def read_hello():
     return {"message": "Hello, world!"}
 
 
-# app/main.py (add route near your others)
 @app.get("/api/welcome")
 def get_random_welcome(db: Session = Depends(get_db)):
     msg = db.query(WelcomeMessage).order_by(func.random()).first()
     if not msg:
-        # Fallback if table has no rows
         return {"message": "Message Table is empty."}
     return {"id": msg.id, "message": msg.message}
+
+
+# ---- Players ----
 
 
 @app.get("/api/players")
@@ -67,17 +88,54 @@ async def get_players(db: Session = Depends(get_db)):
     return db.query(Player).all()
 
 
-@app.get("/api/draft-settings")
-async def get_draft_settings(db: Session = Depends(get_db)):
-    return db.query(DraftSettings).first()
+@app.patch("/api/players/{player_id}")
+def update_player(
+    player_id: int = Path(...),
+    payload: PlayerUpdate = Body(...),
+    db: Session = Depends(get_db),
+):
+    p = db.query(Player).filter(Player.id == player_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(p, k, v)
+
+    db.commit()
+    db.refresh(p)
+    return p
+
+
+@app.post("/api/players/{player_id}/toggle-drafted")
+def toggle_drafted(player_id: int, db: Session = Depends(get_db)):
+    """
+    If player is undrafted -> assign next overall pick number.
+    If player is drafted -> clear (undraft).
+    """
+    p = db.query(Player).filter(Player.id == player_id).first()
+    if not p:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if p.actual_pick_number is None:
+        # Assign next overall pick number = max(existing) + 1
+        next_pick = (db.query(func.max(Player.actual_pick_number)).scalar() or 0) + 1
+        p.actual_pick_number = next_pick
+    else:
+        # Undraft: clear the assignment; we do NOT renumber historical picks
+        p.actual_pick_number = None
+
+    db.commit()
+    db.refresh(p)
+    return {"player": p}
 
 
 @app.post("/api/reset-players")
 async def reset_players(
-    file: UploadFile = File(..., description="CSV columns: name,position,team,projected_points,bye_week"),
+    file: UploadFile = File(..., description="CSV columns: name,position,team,projected_points,bye_week[,predicted_pick_number]"),
     db: Session = Depends(get_db),
 ):
-    # Light content-type guard; browsers sometimes send application/octet-stream
+    # Light content-type guard
     if file.content_type not in ("text/csv", "application/vnd.ms-excel", "application/octet-stream"):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
@@ -101,51 +159,33 @@ async def reset_players(
 
 @app.post("/api/reset-drafted-status")
 async def reset_drafted_status(db: Session = Depends(get_db)):
+    """
+    Clears actual_pick_number for all players (undrafts everyone).
+    Returns count of affected rows.
+    """
     try:
-        db.query(Player).update({"drafted_status": False}, synchronize_session=False)
+        updated = (
+            db.query(Player)
+            .filter(Player.actual_pick_number.isnot(None))
+            .update(
+                {"actual_pick_number": None},
+                synchronize_session=False,
+            )
+        )
         db.commit()
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to reset drafted status: {e}")
 
-    return {"message": "Player draft status reset successfully"}
+    return {"message": "Player draft status reset successfully", "updated": int(updated)}
 
 
-@app.patch("/api/players/{player_id}")
-def update_player(
-    player_id: int = Path(...),
-    payload: dict = Body(...),
-    db: Session = Depends(get_db),
-):
-    p = db.query(Player).filter(Player.id == player_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Player not found")
-
-    # Only allow known fields
-    for key in ["name", "team", "position", "projected_points", "bye_week", "drafted_status", "target_status"]:
-        if key in payload:
-            setattr(p, key, payload[key])
-
-    db.commit()
-    db.refresh(p)
-    return p
+# ---- Draft settings ----
 
 
-@app.post("/api/players/{player_id}/toggle-drafted")
-def toggle_drafted(player_id: int, db: Session = Depends(get_db)):
-    p = db.query(Player).filter(Player.id == player_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Player not found")
-    new_status = not bool(p.drafted_status)
-    p.drafted_status = new_status
-    db.commit()
-    db.refresh(p)
-
-    # Optional: record pick/undo pick in DraftPick table here
-    # if new_status: create DraftPick(...)
-    # else: delete the latest pick for this player
-
-    return {"player": p}
+@app.get("/api/draft-settings")
+async def get_draft_settings(db: Session = Depends(get_db)):
+    return db.query(DraftSettings).first()
 
 
 @app.patch("/api/draft-settings")
@@ -155,15 +195,22 @@ def patch_draft_settings(payload: DraftSettingsUpdate, db: Session = Depends(get
         s = DraftSettings()
         db.add(s)
         db.flush()
+
     for f, v in payload.model_dump(exclude_unset=True).items():
         setattr(s, f, v)
+
     db.commit()
     db.refresh(s)
     return s
 
 
+# ---- VORP ----
+
+
 @app.get("/api/vorp-drop")
 def get_vorp_drop(db: Session = Depends(get_db), k: int = 6):
-    """Returns { player_id: drop } for positions where starters remain."""
+    """
+    Returns { player_id: drop } for positions where starters remain.
+    """
     drops = compute_vorp_drop(db, k=k)
     return drops

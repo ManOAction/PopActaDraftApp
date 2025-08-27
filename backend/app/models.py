@@ -1,43 +1,41 @@
 # app/models.py
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, UniqueConstraint, func
+from sqlalchemy import Column, DateTime, Float, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from .database import Base
 
 
 class Player(Base):
     __tablename__ = "players"
-    __table_args__ = (UniqueConstraint("name", "position", "team", name="uq_players_identity"),)
+    __table_args__ = (
+        UniqueConstraint("name", "position", "team", name="uq_players_identity"),
+        Index("ix_players_position_points", "position", "projected_points"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    position = Column(String)
-    team = Column(String)
-    projected_points = Column(Float)
-    bye_week = Column(Integer)
-    drafted_status = Column(Boolean, default=False)
+    name = Column(String, nullable=False, index=True)
+    position = Column(String, nullable=False)  # QB | RB | WR | TE
+    team = Column(String, nullable=False)  # NFL team code
+    projected_points = Column(Float, nullable=True)
+    bye_week = Column(Integer, nullable=True)
+
+    # Draft prediction + actual pick (single current draft)
+    predicted_pick_number = Column(Integer, nullable=True, index=True)
+    actual_pick_number = Column(Integer, unique=True, index=True, nullable=True)
+
+    # Targeting
     target_status = Column(String, default="default")  # default, target, avoid
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    # Derived convenience flag (replaces drafted_status)
+    @hybrid_property
+    def drafted(self) -> bool:
+        return self.actual_pick_number is not None
 
-class DraftPick(Base):
-    __tablename__ = "draft_picks"
-
-    id = Column(Integer, primary_key=True, index=True)
-    player_id = Column(Integer)
-    team_name = Column(String)
-    pick_number = Column(Integer)
-    round_number = Column(Integer)
-    drafted_at = Column(DateTime(timezone=True), server_default=func.now())
-
-
-class DraftStatus(Base):
-    __tablename__ = "draft_status"
-
-    id = Column(Integer, primary_key=True, index=True)
-    picks_remaining = Column(Integer, default=0)
-    qb_remaining = Column(Integer, default=0)
-    rb_remaining = Column(Integer, default=0)
-    current_pick = Column(Integer, default=1)
+    @drafted.expression
+    def drafted(cls):
+        return cls.actual_pick_number.isnot(None)
 
 
 class DraftSettings(Base):
@@ -46,14 +44,13 @@ class DraftSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     total_teams = Column(Integer, default=12)
     rounds = Column(Integer, default=16)
-    current_pick = Column(Integer, default=1)
-    is_active = Column(Boolean, default=False)
 
-    # New: per-team roster slots
+    # Per-team roster slots
     qb_slots = Column(Integer, default=1)
     rb_slots = Column(Integer, default=2)
     wr_slots = Column(Integer, default=2)
-    flex_slots = Column(Integer, default=1)  # RB/WR
+    te_slots = Column(Integer, default=1)
+    flex_slots = Column(Integer, default=2)  # QB/RB/WR/TE
 
 
 class WelcomeMessage(Base):

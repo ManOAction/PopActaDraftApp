@@ -1,14 +1,17 @@
 # app/services/player_import.py
 import csv
 import io
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..models import Player
 
-REQUIRED_COLUMNS = ["name", "position", "team", "projected_points", "bye_week"]
+# Required base columns for a valid import (order-insensitive, case-insensitive)
+REQUIRED_COLUMNS = {"name", "position", "team", "projected_points", "bye_week"}
+# Optional columns supported by the new schema
+OPTIONAL_COLUMNS = {"predicted_pick_number"}
 
 
 class CSVValidationError(Exception):
@@ -21,38 +24,78 @@ class CSVValidationError(Exception):
 
 def _decode_file(raw: bytes) -> str:
     try:
+        # utf-8 with BOM tolerant
         return raw.decode("utf-8-sig")
     except UnicodeDecodeError as e:
         raise CSVValidationError("File must be UTF-8 encoded") from e
+
+
+def _parse_int(val: str, *, allow_none: bool = False) -> Optional[int]:
+    v = (val or "").strip()
+    if v == "":
+        if allow_none:
+            return None
+        raise ValueError("value is required")
+    try:
+        return int(v)
+    except Exception:
+        raise ValueError("must be an integer")
+
+
+def _parse_float(val: str) -> float:
+    v = (val or "").strip()
+    try:
+        return float(v)
+    except Exception:
+        raise ValueError("must be a number")
 
 
 def parse_players_csv(raw: bytes) -> List[Player]:
     """
     Parse and validate a players CSV. Returns a list of Player objects (not yet added to the session).
     Raises CSVValidationError on header/row issues.
+
+    Required columns (any order): name, position, team, projected_points, bye_week
+    Optional columns: predicted_pick_number
+    Extra columns are ignored.
     """
     text_data = _decode_file(raw)
     f = io.StringIO(text_data, newline="")
     reader = csv.DictReader(f)
 
-    # Validate header (strict order; swap to set() if you want order-insensitive)
-    headers = [h.strip().lower() for h in (reader.fieldnames or [])]
-    if headers != REQUIRED_COLUMNS:
+    # Validate header (order-insensitive, lowercase compare)
+    headers_lower = [h.strip().lower() for h in (reader.fieldnames or [])]
+    header_set = set(headers_lower)
+    missing = REQUIRED_COLUMNS - header_set
+    if missing:
         raise CSVValidationError(
             "Invalid CSV header",
-            errors=[{"expected": REQUIRED_COLUMNS, "received": headers}],
+            errors=[
+                {
+                    "error": "missing required columns",
+                    "missing": sorted(missing),
+                    "received": sorted(header_set),
+                    "required": sorted(REQUIRED_COLUMNS),
+                    "optional": sorted(OPTIONAL_COLUMNS),
+                }
+            ],
         )
+
+    # Map lowercased header -> original key for safe access
+    # (DictReader gives us original keys; we want case-insensitive lookups)
+    key_map = {h.lower(): h for h in (reader.fieldnames or [])}
 
     players: List[Player] = []
     errors: List[Dict] = []
-    rownum = 1  # header
+    rownum = 1  # header row
 
     for row in reader:
         rownum += 1
         try:
-            name = (row["name"] or "").strip()
-            position = (row["position"] or "").strip()
-            team = (row["team"] or "").strip()
+            name = (row[key_map["name"]] or "").strip()
+            position = (row[key_map["position"]] or "").strip().upper()
+            team = (row[key_map["team"]] or "").strip().upper()
+
             if not name:
                 raise ValueError("name is required")
             if not position:
@@ -60,15 +103,16 @@ def parse_players_csv(raw: bytes) -> List[Player]:
             if not team:
                 raise ValueError("team is required")
 
-            try:
-                projected_points = float(row["projected_points"])
-            except Exception:
-                raise ValueError("projected_points must be a number")
+            projected_points = _parse_float(row[key_map["projected_points"]])
+            bye_week = _parse_int(row[key_map["bye_week"]])
 
-            try:
-                bye_week = int(row["bye_week"])
-            except Exception:
-                raise ValueError("bye_week must be an integer")
+            # Optional predicted pick number
+            predicted_pick_number = None
+            if "predicted_pick_number" in header_set:
+                predicted_pick_number = _parse_int(
+                    row[key_map["predicted_pick_number"]],
+                    allow_none=True,
+                )
 
             players.append(
                 Player(
@@ -77,6 +121,8 @@ def parse_players_csv(raw: bytes) -> List[Player]:
                     team=team,
                     projected_points=projected_points,
                     bye_week=bye_week,
+                    predicted_pick_number=predicted_pick_number,
+                    # actual_pick_number intentionally omitted in import (that happens during the draft)
                 )
             )
         except Exception as e:
@@ -100,7 +146,8 @@ def replace_players_transactionally(db: Session, players: List[Player]) -> int:
             try:
                 db.execute(text("DELETE FROM sqlite_sequence WHERE name='players'"))
             except Exception:
-                pass  # Sequence table doesn't exist
+                # sqlite_sequence may not exist (e.g., fresh schema) — ignore
+                pass
         # Bulk insert
         db.bulk_save_objects(players)
         # Commit happens on context exit
