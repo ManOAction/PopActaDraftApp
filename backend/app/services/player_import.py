@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from ..models import Player
 
 # Required base columns for a valid import (order-insensitive, case-insensitive)
-REQUIRED_COLUMNS = {"name", "position", "team", "projected_points", "bye_week"}
+REQUIRED_COLUMNS = {"name", "position", "team", "projected_points"}
 # Optional columns supported by the new schema
-OPTIONAL_COLUMNS = {"predicted_pick_number"}
+OPTIONAL_COLUMNS = {"predicted_pick_number", "bye_week"}
 
 
 class CSVValidationError(Exception):
@@ -55,8 +55,8 @@ def parse_players_csv(raw: bytes) -> List[Player]:
     Parse and validate a players CSV. Returns a list of Player objects (not yet added to the session).
     Raises CSVValidationError on header/row issues.
 
-    Required columns (any order): name, position, team, projected_points, bye_week
-    Optional columns: predicted_pick_number
+    Required columns (any order): name, position, team, projected_points
+    Optional columns: predicted_pick_number, bye_week
     Extra columns are ignored.
     """
     text_data = _decode_file(raw)
@@ -104,7 +104,15 @@ def parse_players_csv(raw: bytes) -> List[Player]:
                 raise ValueError("team is required")
 
             projected_points = _parse_float(row[key_map["projected_points"]])
-            bye_week = _parse_int(row[key_map["bye_week"]])
+
+            # Make bye_week optional with default 0
+            bye_week = 0
+            if "bye_week" in header_set:
+                try:
+                    bye_week = _parse_int(row[key_map["bye_week"]])
+                except ValueError:
+                    # Silently default to 0 for invalid bye weeks
+                    pass
 
             # Optional predicted pick number
             predicted_pick_number = None

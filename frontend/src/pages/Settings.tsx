@@ -9,6 +9,7 @@ type DraftSettings = {
     qb_slots: number;
     rb_slots: number;
     wr_slots: number;
+    te_slots: number;
     flex_slots: number;
 };
 
@@ -54,7 +55,8 @@ export default function Settings() {
                     qb_slots: 1,
                     rb_slots: 2,
                     wr_slots: 2,
-                    flex_slots: 1,
+                    te_slots: 1,
+                    flex_slots: 3,
                     ...data,
                 });
             } catch (e: any) {
@@ -95,6 +97,7 @@ export default function Settings() {
                     qb_slots: settings.qb_slots,
                     rb_slots: settings.rb_slots,
                     wr_slots: settings.wr_slots,
+                    te_slots: settings.te_slots,
                     flex_slots: settings.flex_slots,
                 }),
             });
@@ -186,8 +189,9 @@ export default function Settings() {
         const qb = t * settings.qb_slots;
         const rb = t * settings.rb_slots;
         const wr = t * settings.wr_slots;
+        const te = t * settings.te_slots;
         const flex = t * settings.flex_slots;
-        return `League starters → QB ${qb}, RB ${rb}, WR ${wr}, FLEX ${flex}`;
+        return `League starters → QB ${qb}, RB ${rb}, WR ${wr}, TE ${te}, FLEX ${flex}`;
     })();
 
     return (
@@ -245,7 +249,7 @@ export default function Settings() {
 
                             <div className="divider">Roster Slots (per team)</div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                 <label className="form-control">
                                     <span className="label-text">QB Slots</span>
                                     <input
@@ -271,6 +275,15 @@ export default function Settings() {
                                         className="input input-bordered"
                                         value={settings.wr_slots}
                                         onChange={(e) => setField("wr_slots", parseIntClamp(e.target.value, 0, 6))}
+                                    />
+                                </label>
+                                <label className="form-control">
+                                    <span className="label-text">TE Slots</span>
+                                    <input
+                                        type="number"
+                                        className="input input-bordered"
+                                        value={settings.te_slots}
+                                        onChange={(e) => setField("te_slots", parseIntClamp(e.target.value, 0, 3))}
                                     />
                                 </label>
                                 <label className="form-control">

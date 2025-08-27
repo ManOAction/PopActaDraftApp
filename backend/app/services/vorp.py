@@ -32,12 +32,11 @@ def compute_vorp_drop(db: Session, k: int = 6) -> Dict[int, float]:
     if not s:
         return {}
 
-    # Read slot config (TE may not exist yet -> treat as 0)
     teams = s.total_teams
     qb_slots = getattr(s, "qb_slots", 0)
     rb_slots = getattr(s, "rb_slots", 0)
     wr_slots = getattr(s, "wr_slots", 0)
-    te_slots = getattr(s, "te_slots", 0)  # NEW (defensive default = 0)
+    te_slots = getattr(s, "te_slots", 0)
     flex_slots = getattr(s, "flex_slots", 0)
 
     total_needed_qb = teams * qb_slots
@@ -57,14 +56,15 @@ def compute_vorp_drop(db: Session, k: int = 6) -> Dict[int, float]:
     need_te = max(0, total_needed_te - drafted_te)
 
     # FLEX eligibility now includes QB as requested
-    flex_eligible_positions = ("RB", "WR", "QB")
+    flex_eligible_positions = ("RB", "WR", "TE", "QB")
 
     # Surplus from eligible positions (beyond their locked starters) can satisfy FLEX
     surplus_qb = max(0, drafted_qb - total_needed_qb) if "QB" in flex_eligible_positions else 0
     surplus_rb = max(0, drafted_rb - total_needed_rb) if "RB" in flex_eligible_positions else 0
     surplus_wr = max(0, drafted_wr - total_needed_wr) if "WR" in flex_eligible_positions else 0
-    # (TE not included in FLEX by your request; add if you ever want it)
-    need_flex = max(0, total_needed_flex - (surplus_qb + surplus_rb + surplus_wr))
+    surplus_te = max(0, drafted_te - total_needed_te) if "TE" in flex_eligible_positions else 0
+
+    need_flex = max(0, total_needed_flex - (surplus_qb + surplus_rb + surplus_wr + surplus_te))
 
     out: Dict[int, float] = {}
 

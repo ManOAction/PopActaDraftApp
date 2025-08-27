@@ -64,12 +64,11 @@ def seed_default_data():
     default_settings = DraftSettings(
         total_teams=12,
         rounds=16,
-        current_pick=1,  # you can derive this later if you prefer
         qb_slots=1,
         rb_slots=2,
         wr_slots=2,
         te_slots=1,
-        flex_slots=1,
+        flex_slots=3,
     )
 
     with SessionLocal() as db, db.begin():

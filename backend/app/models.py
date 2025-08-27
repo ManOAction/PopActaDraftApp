@@ -17,7 +17,7 @@ class Player(Base):
     position = Column(String, nullable=False)  # QB | RB | WR | TE
     team = Column(String, nullable=False)  # NFL team code
     projected_points = Column(Float, nullable=True)
-    bye_week = Column(Integer, nullable=True)
+    bye_week = Column(Integer, nullable=False, default=0)  # Updated to non-nullable with default
 
     # Draft prediction + actual pick (single current draft)
     predicted_pick_number = Column(Integer, nullable=True, index=True)
