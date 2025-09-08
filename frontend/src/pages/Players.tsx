@@ -7,7 +7,8 @@ type Player = {
     team: string;
     projected_points: number;
     bye_week: number;
-    drafted_status: boolean;
+    actual_pick_number: number | null;  // Add this
+    drafted: boolean;  // Replace drafted_status with this
     target_status: "default" | "target" | "avoid";
     created_at: string;
 };
@@ -23,7 +24,7 @@ const cardClasses = (p: Player) =>
         p.target_status === "target" && "ring-2 ring-success/50",
         p.target_status === "avoid" && "ring-2 ring-error/50",
         // drafted look: darker, slightly muted
-        p.drafted_status && "bg-base-200 border-base-300 opacity-75 grayscale brightness-90"
+        p.drafted && "bg-base-200 border-base-300 opacity-75 grayscale brightness-90"  // Use drafted instead of drafted_status
     );
 
 export default function Players() {
@@ -88,7 +89,7 @@ export default function Players() {
                     position: editing.position,
                     projected_points: editing.projected_points,
                     bye_week: editing.bye_week,
-                    drafted_status: editing.drafted_status,
+                    drafted: editing.drafted,  // Replace drafted_status with this
                     target_status: editing.target_status,
                 }),
             });
@@ -118,7 +119,7 @@ export default function Players() {
                     <button key={`${title}-${p.id}`} className={cardClasses(p)} onClick={() => openEdit(p)}>
                         <div className="card-body p-4 relative">
                             {/* Drafted ribbon/flag */}
-                            {p.drafted_status && (
+                            {p.drafted && (
                                 <div className="absolute right-2 top-2">
                                     <span className="badge badge-neutral">Drafted</span>
                                 </div>
@@ -268,8 +269,8 @@ export default function Players() {
                                     <input
                                         type="checkbox"
                                         className="toggle"
-                                        checked={editing.drafted_status}
-                                        onChange={e => setEditing({ ...editing, drafted_status: e.target.checked })}
+                                        checked={editing.drafted}
+                                        onChange={e => setEditing({ ...editing, drafted: e.target.checked })}
                                     />
                                 </label>
                             </div>

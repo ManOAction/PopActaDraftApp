@@ -1,6 +1,6 @@
-# app/services/vorp.py
+from math import ceil
 from statistics import mean
-from typing import Dict, Iterable, List
+from typing import Dict, List
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -8,8 +8,12 @@ from sqlalchemy.orm import Session
 from ..models import DraftSettings, Player
 
 
-def _sorted_pool(db: Session, where) -> List[Player]:
-    return db.query(Player).filter(where).order_by(Player.projected_points.desc()).all()
+def _sorted_available_pool(db: Session, where) -> List[Player]:
+    """
+    Return UNDRAFTED players matching 'where', sorted by projected_points desc.
+    Undrafted = actual_pick_number IS NULL.
+    """
+    return db.query(Player).filter(where, Player.actual_pick_number.is_(None)).order_by(Player.projected_points.desc()).all()
 
 
 def _count_drafted(db: Session, pos: str) -> int:
@@ -17,20 +21,28 @@ def _count_drafted(db: Session, pos: str) -> int:
     return db.query(Player).filter(Player.position == pos, Player.actual_pick_number.isnot(None)).count()
 
 
-def _sum_projected(points: Iterable[Player]) -> float:
-    return sum(p.projected_points for p in points if p.projected_points is not None)
-
-
-def compute_vorp_drop(db: Session, k: int = 6) -> Dict[int, float]:
+def compute_vorp_drop(db: Session, k: int = 3) -> Dict[str, Dict[int, float]]:
     """
-    Returns {player_id: drop} where drop = projected - avg(projected of next k at same pool).
-    Pools include QB, RB, WR, TE (by position), plus a FLEX pool (RB/WR/QB).
-    Only positions with remaining *starter* slots contribute position-specific drops.
-    FLEX contributes if FLEX slots remain after applying RB/WR/QB surpluses.
+    Replacement-level VORP with separate outputs:
+
+      - pos:  position-only pools (QB/RB/WR/TE) using a replacement baseline at
+              50% of remaining starters (ceil(rem * 0.5) - 1), averaged over up to k players.
+      - flex: blended FLEX pool (QB+RB+WR+TE) using the same replacement rule.
+      - combined: max(pos, flex) per player.
+
+    Returns:
+      {
+        "pos": {player_id: drop},
+        "flex": {player_id: drop},
+        "combined": {player_id: drop}
+      }
     """
     s: DraftSettings | None = db.query(DraftSettings).first()
     if not s:
-        return {}
+        return {"pos": {}, "flex": {}, "combined": {}}
+
+    k = max(1, int(k))
+    HALF = 0.5  # 50% of remaining starters for replacement point
 
     teams = s.total_teams
     qb_slots = getattr(s, "qb_slots", 0)
@@ -50,56 +62,82 @@ def compute_vorp_drop(db: Session, k: int = 6) -> Dict[int, float]:
     drafted_wr = _count_drafted(db, "WR")
     drafted_te = _count_drafted(db, "TE")
 
-    need_qb = max(0, total_needed_qb - drafted_qb)
-    need_rb = max(0, total_needed_rb - drafted_rb)
-    need_wr = max(0, total_needed_wr - drafted_wr)
-    need_te = max(0, total_needed_te - drafted_te)
+    # Real remaining starters by position
+    rem_qb = max(0, total_needed_qb - drafted_qb)
+    rem_rb = max(0, total_needed_rb - drafted_rb)
+    rem_wr = max(0, total_needed_wr - drafted_wr)
+    rem_te = max(0, total_needed_te - drafted_te)
 
-    # FLEX eligibility now includes QB as requested
-    flex_eligible_positions = ("RB", "WR", "TE", "QB")
+    # Effective remaining (50% rule)
+    need_qb = ceil(rem_qb * HALF)
+    need_rb = ceil(rem_rb * HALF)
+    need_wr = ceil(rem_wr * HALF)
+    need_te = ceil(rem_te * HALF)
 
-    # Surplus from eligible positions (beyond their locked starters) can satisfy FLEX
-    surplus_qb = max(0, drafted_qb - total_needed_qb) if "QB" in flex_eligible_positions else 0
-    surplus_rb = max(0, drafted_rb - total_needed_rb) if "RB" in flex_eligible_positions else 0
-    surplus_wr = max(0, drafted_wr - total_needed_wr) if "WR" in flex_eligible_positions else 0
-    surplus_te = max(0, drafted_te - total_needed_te) if "TE" in flex_eligible_positions else 0
+    # FLEX eligibility includes all positions
+    flex_eligible_positions = ("RB", "WR", "TE")
 
-    need_flex = max(0, total_needed_flex - (surplus_qb + surplus_rb + surplus_wr + surplus_te))
+    # Surplus can satisfy FLEX
+    surplus_qb = max(0, drafted_qb - total_needed_qb)
+    surplus_rb = max(0, drafted_rb - total_needed_rb)
+    surplus_wr = max(0, drafted_wr - total_needed_wr)
+    surplus_te = max(0, drafted_te - total_needed_te)
+    rem_flex = max(0, total_needed_flex - (surplus_rb + surplus_wr + surplus_te))
+    need_flex = ceil(rem_flex * HALF)
 
-    out: Dict[int, float] = {}
-
-    def score_pool(pool: List[Player], store: Dict[int, float]):
+    def replacement_baseline(pool: List[Player], remaining_effective: int) -> float | None:
         n = len(pool)
-        for i, p in enumerate(pool):
-            nxt = pool[i + 1 : i + 1 + k]
-            if not nxt:
-                continue
-            # Guard against None projected_points
+        if n == 0 or remaining_effective <= 0:
+            return None
+        rep_idx0 = max(0, min(n - 1, remaining_effective - 1))  # 0-based
+        window = [p.projected_points for p in pool[rep_idx0 : rep_idx0 + k] if p.projected_points is not None]
+        if not window:
+            return None
+        return float(mean(window))
+
+    def make_drops(pool: List[Player], remaining_effective: int) -> Dict[int, float]:
+        drops: Dict[int, float] = {}
+        baseline = replacement_baseline(pool, remaining_effective)
+        if baseline is None:
+            return drops
+        for p in pool:
             if p.projected_points is None:
                 continue
-            next_points = [x.projected_points for x in nxt if x.projected_points is not None]
-            if not next_points:
-                continue
-            store[p.id] = float(p.projected_points - mean(next_points))
+            drops[p.id] = float(p.projected_points - baseline)
+        return drops
 
-    # Position-specific VORP only if starters still needed at that position
+    # ----- position-only drops -----
+    pos_drops: Dict[int, float] = {}
+
     if need_qb > 0:
-        score_pool(_sorted_pool(db, Player.position == "QB"), out)
+        qb_pool = _sorted_available_pool(db, Player.position == "QB")
+        pos_drops.update(make_drops(qb_pool, need_qb))
     if need_rb > 0:
-        score_pool(_sorted_pool(db, Player.position == "RB"), out)
+        rb_pool = _sorted_available_pool(db, Player.position == "RB")
+        pos_drops.update(make_drops(rb_pool, need_rb))
     if need_wr > 0:
-        score_pool(_sorted_pool(db, Player.position == "WR"), out)
+        wr_pool = _sorted_available_pool(db, Player.position == "WR")
+        pos_drops.update(make_drops(wr_pool, need_wr))
     if need_te > 0:
-        score_pool(_sorted_pool(db, Player.position == "TE"), out)
+        te_pool = _sorted_available_pool(db, Player.position == "TE")
+        pos_drops.update(make_drops(te_pool, need_te))
 
-    # FLEX pool (RB/WR/QB together) if FLEX starters still needed
-    if need_flex > 0 and flex_eligible_positions:
-        pool = _sorted_pool(db, or_(*[Player.position == pos for pos in flex_eligible_positions]))
-        score_pool(pool, out)  # don't overwrite existing pos scores; score_pool writes/overwrites by id
-        # If you prefer to *not* overwrite position scores with FLEX, use:
-        # temp: Dict[int, float] = {}
-        # score_pool(pool, temp)
-        # for pid, val in temp.items():
-        #     out.setdefault(pid, val)
+    # ----- flex drops (blended pool) -----
+    flex_drops: Dict[int, float] = {}
+    if need_flex > 0:
+        flex_pool = _sorted_available_pool(db, or_(*[Player.position == pos for pos in flex_eligible_positions]))
+        flex_drops = make_drops(flex_pool, need_flex)
 
-    return out
+    # ----- combined = max(pos, flex) -----
+    combined: Dict[int, float] = {}
+    for pid in set(list(pos_drops.keys()) + list(flex_drops.keys())):
+        p = pos_drops.get(pid)
+        f = flex_drops.get(pid)
+        if p is None:
+            combined[pid] = f  # type: ignore
+        elif f is None:
+            combined[pid] = p
+        else:
+            combined[pid] = max(p, f)
+
+    return {"pos": pos_drops, "flex": flex_drops, "combined": combined}

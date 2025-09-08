@@ -1,5 +1,6 @@
 # app/main.py
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from fastapi import Body, Depends, FastAPI, File, HTTPException, Path, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -117,17 +118,32 @@ def toggle_drafted(player_id: int, db: Session = Depends(get_db)):
     if not p:
         raise HTTPException(status_code=404, detail="Player not found")
 
+    settings = db.query(DraftSettings).first()
+    teams_per_round = settings.total_teams if settings else 12
+
     if p.actual_pick_number is None:
         # Assign next overall pick number = max(existing) + 1
         next_pick = (db.query(func.max(Player.actual_pick_number)).scalar() or 0) + 1
         p.actual_pick_number = next_pick
+        # Calculate round number (1-based)
+        round_number = ((next_pick - 1) // teams_per_round) + 1
+        # Calculate pick within round (1-based)
+        pick_in_round = ((next_pick - 1) % teams_per_round) + 1
     else:
-        # Undraft: clear the assignment; we do NOT renumber historical picks
+        # Undraft: clear the assignment
         p.actual_pick_number = None
+        round_number = None
+        pick_in_round = None
 
     db.commit()
     db.refresh(p)
-    return {"player": p}
+
+    return {
+        "player": p,
+        "pick_number": p.actual_pick_number,
+        "round_number": round_number,
+        "pick_in_round": pick_in_round,
+    }
 
 
 @app.post("/api/reset-players")
@@ -180,6 +196,27 @@ async def reset_drafted_status(db: Session = Depends(get_db)):
     return {"message": "Player draft status reset successfully", "updated": int(updated)}
 
 
+@app.get("/api/draft-picks/recent")
+def recent_picks(limit: int = 12, db: Session = Depends(get_db)):
+    """
+    Return the most recent picks by descending actual_pick_number.
+    """
+    rows = db.query(Player).filter(Player.actual_pick_number.isnot(None)).order_by(Player.actual_pick_number.desc()).limit(limit).all()
+    return [
+        {
+            "id": p.id,
+            "pick_number": p.actual_pick_number,
+            "player": {
+                "id": p.id,
+                "name": p.name,
+                "team": p.team,
+                "position": p.position,
+            },
+        }
+        for p in rows
+    ]
+
+
 # ---- Draft settings ----
 
 
@@ -208,9 +245,18 @@ def patch_draft_settings(payload: DraftSettingsUpdate, db: Session = Depends(get
 
 
 @app.get("/api/vorp-drop")
-def get_vorp_drop(db: Session = Depends(get_db), k: int = 6):
+def get_vorp_drop(
+    db: Session = Depends(get_db),
+    k: int = 3,
+    view: Literal["pos", "flex", "combined"] | None = None,
+):
     """
-    Returns { player_id: drop } for positions where starters remain.
+    Returns one of:
+      - view=pos       -> position-only drops
+      - view=flex      -> blended FLEX drops
+      - view=combined  -> max(pos, flex)  [default if view omitted]
     """
-    drops = compute_vorp_drop(db, k=k)
-    return drops
+    all_maps = compute_vorp_drop(db, k=k)
+    if view in ("pos", "flex", "combined"):
+        return all_maps[view]
+    return all_maps["combined"]

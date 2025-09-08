@@ -50,7 +50,7 @@ class DraftSettings(Base):
     rb_slots = Column(Integer, default=2)
     wr_slots = Column(Integer, default=2)
     te_slots = Column(Integer, default=1)
-    flex_slots = Column(Integer, default=2)  # QB/RB/WR/TE
+    flex_slots = Column(Integer, default=2)  # RB/WR/TE
 
 
 class WelcomeMessage(Base):

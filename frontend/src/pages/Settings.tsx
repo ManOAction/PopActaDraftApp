@@ -4,13 +4,16 @@ type DraftSettings = {
     id: number;
     total_teams: number;
     rounds: number;
-    current_pick: number;
-    is_active: boolean;
     qb_slots: number;
     rb_slots: number;
     wr_slots: number;
     te_slots: number;
     flex_slots: number;
+
+    // You can keep these locally if you still want to show them in the UI,
+    // but they are NOT persisted by the backend anymore:
+    current_pick?: number;
+    is_active?: boolean;
 };
 
 type ResetResult = {
@@ -50,13 +53,13 @@ export default function Settings() {
                 const r = await fetch("/api/draft-settings");
                 if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 const data = await r.json();
-                // ensure defaults if backend is adding columns on the fly
+                // ensure sensible defaults if backend adds columns later
                 setSettings({
                     qb_slots: 1,
                     rb_slots: 2,
                     wr_slots: 2,
                     te_slots: 1,
-                    flex_slots: 3,
+                    flex_slots: 2,
                     ...data,
                 });
             } catch (e: any) {
@@ -92,8 +95,7 @@ export default function Settings() {
                 body: JSON.stringify({
                     total_teams: settings.total_teams,
                     rounds: settings.rounds,
-                    current_pick: settings.current_pick,
-                    is_active: settings.is_active,
+                    // NOTE: do NOT send current_pick or is_active — they are not persisted on the backend
                     qb_slots: settings.qb_slots,
                     rb_slots: settings.rb_slots,
                     wr_slots: settings.wr_slots,
@@ -161,13 +163,13 @@ export default function Settings() {
         }
     };
 
-    // Confirm reset drafted
+    // Confirm reset drafted — FIXED ENDPOINT PATH
     const onConfirmReset = async () => {
         setResetErr(null);
         setResetCount(null);
         try {
             setResetting(true);
-            const r = await fetch("/api/players/reset-drafted-status", { method: "POST" });
+            const r = await fetch("/api/reset-drafted-status", { method: "POST" });
             const data = await r.json().catch(() => null);
             if (!r.ok) {
                 const detail =
@@ -201,7 +203,11 @@ export default function Settings() {
                 <div className="card-body">
                     <h2 className="card-title">Draft Settings</h2>
                     {loading && <span className="loading loading-spinner" />}
-                    {err && <div className="alert alert-error"><span>{err}</span></div>}
+                    {err && (
+                        <div className="alert alert-error">
+                            <span>{err}</span>
+                        </div>
+                    )}
 
                     {!loading && !err && settings && (
                         <form className="space-y-4" onSubmit={onSaveSettings}>
@@ -223,26 +229,6 @@ export default function Settings() {
                                         className="input input-bordered"
                                         value={settings.rounds}
                                         onChange={(e) => setField("rounds", parseIntClamp(e.target.value, 1, 40))}
-                                    />
-                                </label>
-
-                                <label className="form-control">
-                                    <span className="label-text">Current Pick</span>
-                                    <input
-                                        type="number"
-                                        className="input input-bordered"
-                                        value={settings.current_pick}
-                                        onChange={(e) => setField("current_pick", Math.max(1, parseIntClamp(e.target.value, 1, 999)))}
-                                    />
-                                </label>
-
-                                <label className="label cursor-pointer gap-3">
-                                    <span className="label-text">Draft Active?</span>
-                                    <input
-                                        type="checkbox"
-                                        className="toggle"
-                                        checked={settings.is_active}
-                                        onChange={(e) => setField("is_active", e.target.checked)}
                                     />
                                 </label>
                             </div>
@@ -299,8 +285,16 @@ export default function Settings() {
 
                             <p className="text-sm opacity-70">{startersSummary}</p>
 
-                            {saveErr && <div className="alert alert-error"><span>{saveErr}</span></div>}
-                            {saveOk && <div className="alert alert-success"><span>{saveOk}</span></div>}
+                            {saveErr && (
+                                <div className="alert alert-error">
+                                    <span>{saveErr}</span>
+                                </div>
+                            )}
+                            {saveOk && (
+                                <div className="alert alert-success">
+                                    <span>{saveOk}</span>
+                                </div>
+                            )}
 
                             <div className="mt-2">
                                 <button className="btn btn-primary" type="submit" disabled={saving}>
@@ -341,7 +335,7 @@ export default function Settings() {
                 </div>
             </div>
 
-            {/* Reset drafted status */}
+            {/* Draft actions */}
             <div className="card bg-base-100 shadow">
                 <div className="card-body">
                     <div className="flex items-center justify-between">
@@ -351,12 +345,14 @@ export default function Settings() {
                         </button>
                     </div>
                     <p className="text-sm opacity-70">
-                        Set <code>drafted_status</code> to <b>false</b> for all players.
+                        Clears <code>actual_pick_number</code> for <b>all</b> players.
                     </p>
 
                     {resetCount !== null && (
                         <div className="alert alert-success mt-3">
-                            <span>Drafted status reset for <b>{resetCount}</b> players.</span>
+                            <span>
+                                Drafted status reset (cleared picks) for <b>{resetCount}</b> players.
+                            </span>
                         </div>
                     )}
                     {resetErr && (
@@ -371,9 +367,7 @@ export default function Settings() {
             <dialog ref={dialogRef} className="modal">
                 <div className="modal-box">
                     <h3 className="font-bold text-lg">Upload Players CSV</h3>
-                    <p className="py-2 text-sm opacity-70">
-                        This will replace all players in the database.
-                    </p>
+                    <p className="py-2 text-sm opacity-70">This will replace all players in the database.</p>
 
                     <form className="mt-2 space-y-4" onSubmit={onSubmit}>
                         <input
@@ -394,7 +388,11 @@ export default function Settings() {
                         </div>
                     </form>
 
-                    {uploadErr && <div className="alert alert-error mt-3"><span>{uploadErr}</span></div>}
+                    {uploadErr && (
+                        <div className="alert alert-error mt-3">
+                            <span>{uploadErr}</span>
+                        </div>
+                    )}
                 </div>
                 <form method="dialog" className="modal-backdrop">
                     <button>close</button>
@@ -406,7 +404,7 @@ export default function Settings() {
                 <div className="modal-box">
                     <h3 className="font-bold text-lg">Reset Drafted Status</h3>
                     <p className="py-2 text-sm opacity-70">
-                        This will set <code>drafted_status = false</code> for <b>all</b> players.
+                        This will clear <code>actual_pick_number</code> (i.e., undraft) for <b>all</b> players.
                     </p>
                     <div className="modal-action">
                         <button className="btn btn-ghost" onClick={closeResetModal} disabled={resetting}>
@@ -417,7 +415,11 @@ export default function Settings() {
                         </button>
                     </div>
 
-                    {resetErr && <div className="alert alert-error mt-3"><span>{resetErr}</span></div>}
+                    {resetErr && (
+                        <div className="alert alert-error mt-3">
+                            <span>{resetErr}</span>
+                        </div>
+                    )}
                 </div>
                 <form method="dialog" className="modal-backdrop">
                     <button>close</button>
