@@ -1,0 +1,13 @@
+# Normalise line endings to LF everywhere.
+#
+# This repo is developed on Windows but linted by ruff and prettier, both of
+# which normalise to LF. Without this file every checkout rewrites to CRLF and
+# every formatter run shows the whole file as changed.
+
+* text=auto eol=lf
+
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.db   binary
+*.sqlite3 binary

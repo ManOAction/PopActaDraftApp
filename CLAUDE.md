@@ -11,15 +11,19 @@ sits beside it and answers one question continuously:
 ## Status
 
 **Phase 0 (foundation).** The 2025 app was moved to `legacy/` and is being rebuilt, not refactored.
-`api/` and `web/` are empty scaffolds — there is no working application right now. Do not assume
-any code exists; check before referencing it.
+There is **no working application** — `api/` holds a toolchain and an empty package, `web/` holds
+only a `package.json`. Do not assume any code exists; check before referencing it.
+
+**The repo is being relocated off Google Drive** — `npm install` fails there with `EBADF`
+(BLK-8 in `docs/open-issues.md`). `web/` work is blocked until the move completes. See
+*Resume here after the repo is relocated* in `docs/roadmap.md`.
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| `api/` | New backend (Python/FastAPI). **Empty scaffold.** |
-| `web/` | New frontend (React/TS/Vite/Tailwind/shadcn). **Empty scaffold.** |
+| `api/` | New backend (Python/FastAPI). Toolchain only — no application code yet. |
+| `web/` | New frontend (React/TS/Vite/Tailwind/shadcn). **Not yet scaffolded** (BLK-8). |
 | `data/` | Input data. `data/fantasypros/` holds the projection CSV exports. |
 | `analytics/` | NFL game scraper + ELO. **Parked** — see `analytics/CLAUDE.md`. |
 | `infra/` | Docker Compose + Caddy. Not yet written. |
@@ -28,15 +32,24 @@ any code exists; check before referencing it.
 
 ## Commands
 
-Nothing is built yet, so there are no build/test commands. **Add them here in the same commit
-that introduces them** — this table is the first place anyone looks.
+**Add commands here in the same commit that introduces them** — this table is the first place
+anyone looks. Every command below was run and verified on 2026-07-31.
+
+Run these from the **repo root**; `--project api` means you never need to `cd`.
 
 | Task | Command |
 | --- | --- |
-| Test (api) | _not yet_ |
-| Lint/format (api) | _not yet_ |
-| Dev server (api) | _not yet_ |
-| Dev server (web) | _not yet_ |
+| Install/sync (api) | `uv sync --project api` |
+| Test (api) | `uv run --project api pytest api` |
+| Lint (api) | `uv run --project api ruff check api` |
+| Format (api) | `uv run --project api ruff format api` |
+| Format check (api) | `uv run --project api ruff format --check api` |
+| Dev server (api) | _not yet — no FastAPI app exists_ |
+| Everything under `web/` | _not yet — blocked by BLK-8_ |
+
+**Pass the `api` path to pytest.** `uv run --project api pytest` with no path argument sets
+rootdir to the repo root, finds no config file, and silently ignores `api/pyproject.toml`'s
+`[tool.pytest.ini_options]`. The tests still appear to pass, so the misconfiguration is invisible.
 
 ## Documentation map — read on demand
 

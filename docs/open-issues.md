@@ -17,6 +17,7 @@ reproducing.
 | BLK-1 | **Rankings CSV export not yet pulled.** Need the FantasyPros *rankings* export (not projections) set to Half PPR + superflex/"OP". Supplies ADP, `Std Dev`, `Tier`, `Bye`. | Survival probability, tier detection, bye weeks | Jacob |
 | BLK-2 | **No DST projections.** `DEF` is a required starter and no source is identified. Low variance, so a rough list suffices. | Complete board | Jacob |
 | BLK-3 | **Draft slot unknown.** Sleeper's `draft_order` is not yet populated for draft `1385689586394488832`. | Next-pick math uses a placeholder until set | Sleeper |
+| BLK-8 | **`npm install` fails on the Google Drive path.** Exits 13 with `EBADF: bad file descriptor, write` while writing `web/node_modules`. Drive's sync layer does not survive npm's write pattern. `uv sync` on the same path succeeded, so this is npm-specific, not a general filesystem failure. Repo is being relocated off Drive. | All `web/` work — scaffold, Tailwind, shadcn, Playwright | Jacob |
 
 ---
 

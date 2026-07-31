@@ -1,0 +1,16 @@
+{
+  "name": "popacta-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b --noEmit",
+    "screenshot": "tsx scripts/screenshot.ts"
+  }
+}

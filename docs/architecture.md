@@ -86,9 +86,16 @@ Nothing runs yet. Commands go in root `CLAUDE.md` **in the same commit that intr
 
 These have each already cost time. They are not hypothetical.
 
-**The repo lives on Google Drive.** The path contains a space (`My Drive`), so every path in a
-shell command needs quoting. Sync also means large churning directories (`node_modules/`,
-`venv/`) generate constant upload traffic — expect installs to feel slower than they should.
+**The repo lived on Google Drive, and is being moved off it (2026-07-31).** The path contained a
+space (`My Drive`), so every shell command needed quoting. Worse, `npm install` **fails outright**
+there — exit 13, `EBADF: bad file descriptor, write`, partway through writing `web/node_modules`.
+Drive's sync layer does not survive npm's write pattern. `uv sync` on the same path succeeded, so
+this is npm-specific rather than a general filesystem failure. Tracked as BLK-8 in
+[open-issues.md](open-issues.md).
+
+**`.venv/` and `node_modules/` do not survive a move.** Both hardcode absolute paths, and both are
+gitignored, so git does not carry them. After relocating, delete any copies and reinstall — don't
+debug a venv that still thinks it lives on `G:\`.
 
 **Windows Python cannot resolve Git Bash's `/tmp`.** A script invoked as `python /tmp/x.py` from
 Bash fails with `FileNotFoundError`, because Python interprets `/tmp` as `C:\tmp`. Use the

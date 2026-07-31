@@ -139,16 +139,46 @@ three days, cut and move on.
 - [x] Docs: [`architecture.md`](architecture.md), [`open-issues.md`](open-issues.md),
       [`FeatureDescription_PickAdvisor.md`](FeatureDescription_PickAdvisor.md)
 
+**Also done (2026-07-31, later session):**
+
+- [x] **Committed** — `d62b525` put the relayout and docs in git. They had existed only as
+      uncommitted working-tree changes on a Drive folder.
+- [x] `.gitattributes` normalising line endings to LF. Windows checkouts were rewriting every
+      file to CRLF, which would make every `ruff format` / `prettier` run show whole-file diffs.
+- [x] `api/` Python toolchain: `uv` + `ruff` + `pytest`, **verified green** — see Commands in
+      root [`CLAUDE.md`](../CLAUDE.md). `api/uv.lock` committed.
+
 **Remaining:**
 
-- [ ] `.claude/rules/` for Python and TypeScript style
+- [ ] `web/` scaffold — Vite + React + TS + Tailwind v4, shadcn-ready. **Blocked by BLK-8**
+      (`npm install` fails with `EBADF` on the Drive path).
+- [ ] Browser automation for the design feedback loop. Blocked behind the `web/` scaffold.
+- [ ] Python and TypeScript style rules as `api/CLAUDE.md` and `web/CLAUDE.md`
 - [ ] Custom sub-agents in `.claude/agents/`: design reviewer (browser + screenshot), draft-logic
       verifier, test writer
-- [ ] `uv` + `ruff` + `pytest` + GitHub Actions green on push; record commands in root `CLAUDE.md`
-- [ ] Browser automation wired up for the design feedback loop
+- [ ] GitHub Actions green on push (`origin` is `github.com/ManOAction/PopActaDraftApp`, so this
+      will genuinely run — unlike LEG-11's fictional infrastructure)
 - [ ] Rewrite `README.md` — it still describes the 2025 app, its stack, and a Let's Encrypt setup
       that never existed
-- [ ] **Commit.** Nothing above is in git yet.
+
+### Resume here after the repo is relocated
+
+The repo is moving off Google Drive because of BLK-8. `.venv/` and `node_modules/` are gitignored
+and therefore do **not** travel with git — which is correct, because both hardcode absolute paths
+and would be broken at the new location anyway.
+
+At the new path:
+
+1. Delete any copied `api/.venv` and `web/node_modules` — they hold the old `G:\My Drive\...` paths.
+2. `uv sync --project api`, then re-verify with the Commands table in root `CLAUDE.md`.
+3. Retry the `web/` scaffold install. If it succeeds, close BLK-8 with the resolution.
+
+**Toolchain trap found while verifying** (recorded here because it is exactly the class of silent
+misconfiguration this project keeps losing time to): `uv run --project api pytest` with **no path
+argument** sets rootdir to the repo root, finds no config file, and silently ignores
+`api/pyproject.toml`'s `[tool.pytest.ini_options]` — including `--strict-config`. Tests still
+appear to pass. `uv run --project api pytest api` sets rootdir to `api/` and loads the config.
+Always pass the path.
 
 ### Phase 1 — Domain core *(~3 days)*
 
