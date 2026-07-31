@@ -15,7 +15,6 @@ reproducing.
 | ID | Issue | Blocks | Owner |
 | --- | --- | --- | --- |
 | BLK-1 | **Rankings export pulled, but it is the wrong variant — still blocking.** See below. | Survival probability, tier detection, bye weeks | Jacob |
-| BLK-2 | **No DST data at all in the current exports.** The superflex ("OP") rankings file covers QB/RB/WR/TE only. `DEF` is a required starter. Needs both an ordering *and* projected points — low variance, so a rough source suffices. | Complete board, VORP for DEF | Jacob |
 | BLK-3 | **Draft slot unknown.** Sleeper's `draft_order` is not yet populated for draft `1385689586394488832`. | Next-pick math uses a placeholder until set | Sleeper |
 
 ### BLK-1 detail — what was pulled, and what is still missing
@@ -43,10 +42,9 @@ variance**; neither is recoverable from these columns.
 `BYE` are complete (0 missing across all 768 rows), and `POS` carries positional rank. **Bye weeks
 can be imported from this file now** — that closes the LEG-4 gap independently of the ADP problem.
 
-**Watch out — this export drops DST and K.** Positions present are QB (63), RB (242), WR (294),
-TE (169) only. The superseded 1QB "ALL" export *did* include 32 DST and 29 K rows. **DEF is a
-required starter**, so keep a DST-bearing export alongside this one rather than replacing it. See
-BLK-2.
+**The missing DST and K rows turned out not to matter.** This export covers QB (63), RB (242),
+WR (294), TE (169) only. That is now exactly the universe this app ranks — see BLK-2, closed by
+decision. No supplementary export is needed.
 
 ---
 
@@ -91,4 +89,5 @@ All confirmed by reading `legacy/` or last year's `app.db`. Each shipped.
 | BLK-5 | Unclear whether league scoring differed from FantasyPros defaults | 2026-07-31 | Recomputed `FPTS` from raw stats for all 518 players; max deviation 0.62 pts, all rounding. Offensive scoring is identical to default Half PPR. DST unverified — still custom. |
 | BLK-6 | Whether the FantasyPros API could replace the CSV loader | 2026-07-31 | **No.** Free tier caps every endpoint at 10 rows (10 of 768 rankings, 10 of 8,509 players). Full access prohibitively expensive. CSV export it is. |
 | BLK-7 | Whether to build draft-day notifications | 2026-07-31 | Not building. Slow draft (1hr timer) and Sleeper already notifies. |
+| BLK-2 | No DST projections; `DEF` is a required starter | 2026-07-31 | **Closed by decision, not by data.** The strategy is to stream defenses, and the league has no K slot, so neither position is projected, ranked, or recommended. `DEF` and `K` still *parse* — other teams draft defenses and Sleeper sends us those picks, so a model that rejected them would break draft-night sync. Two sets now exist: `Position` (everything parseable) and `RANKED_POSITIONS` (QB/RB/WR/TE). The `DEF` roster slot is excluded from `ranked_starter_slots`, so it never surfaces as an unfilled need. See `docs/plan_phase1_domain_core.md`, decision 1. |
 | BLK-8 | `npm install` failed with `EBADF` on the Google Drive path | 2026-07-31 | **Repo relocated to `C:\Projects\PopActaDraftApp`.** `npm install` there succeeds — 184 packages, exit 0, ~27s. The Drive sync layer was the entire cause; nothing in the repo needed changing. `web/` is scaffolded and CI is green. |

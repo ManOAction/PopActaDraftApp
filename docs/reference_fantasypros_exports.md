@@ -75,7 +75,8 @@ A separate **rankings** export is required for those — set to **Half PPR** and
 - `Tier` — cross-checks the tier detection in Phase 2
 - `Bye` — absent here; last year's import silently defaulted every bye week to 0
 
-**DST projections are also missing** and must be sourced separately. DEF is a required starter.
+**DST projections are also missing**, which turns out not to matter — defenses are streamed and
+there is no K slot, so QB/RB/WR/TE is the whole ranked universe (BLK-2, closed by decision).
 
 ## The rankings export — variants matter more than expected
 
@@ -108,9 +109,11 @@ variance, so a different export variant — the one carrying
 `Best / Worst / Avg / Std Dev / ADP` — is still required. Tracked as BLK-1 in
 [open-issues.md](open-issues.md).
 
-**3. The superflex export drops DST and K entirely.** Positions are QB/RB/WR/TE only. `DEF` is a
-required starter in this league, so a DST source has to come from somewhere else — keep the
-DST-bearing export alongside rather than replacing it (BLK-2).
+**3. The superflex export drops DST and K entirely** — positions are QB/RB/WR/TE only. This is
+**fine**: defenses are streamed and the league has no K slot, so QB/RB/WR/TE is exactly the
+universe this app ranks (BLK-2, closed by decision). Note the consequence for the projections
+files too — `QB ∪ FLX` covers all 518 QB/RB/WR/TE players, so **the projection data already in
+`data/fantasypros/` is complete for our purposes.** No supplementary export is needed.
 
 What *is* good in the superflex file: `RK` as a consensus superflex ordering, positional rank
 inside `POS`, and **`TIERS` and `BYE` complete on all 768 rows** — enough to import bye weeks

@@ -43,8 +43,11 @@ Four consequences that drive the design:
    recomputed from stats rather than read from `FPTS`, so a mid-August scoring change is a
    non-event. Only **DST scoring is custom** (points-allowed tiers), and DST is one low-variance
    slot. See [reference_fantasypros_exports.md](reference_fantasypros_exports.md).
-3. **DEF is a required starter; there is no K slot.** Last year's data had neither DST nor K —
-   this is a gap to close, not a port.
+3. **DEF is a required starter, but defenses are streamed and there is no K slot.** Neither
+   position is projected, ranked, or recommended (BLK-2, closed by decision on 2026-07-31). Both
+   still *parse*, because other teams draft defenses and Sleeper sends us those picks. The
+   universe this app ranks is exactly QB/RB/WR/TE — which is also exactly what the FantasyPros
+   superflex export contains.
 4. **Sleeper's API is public and read-only** (no auth; ~1000 req/min). League config, scoring
    rules, and live draft picks are all fetchable — polling every few seconds during a draft is
    well within budget. This removes most manual data entry.
@@ -183,11 +186,19 @@ misconfiguration this project keeps losing time to:
 
 Pure functions, no DB coupling, heavily tested. The part the old app never modeled.
 
+**Detailed contracts, module signatures, agent ownership and acceptance criteria:
+[`plan_phase1_domain_core.md`](plan_phase1_domain_core.md).** Read that before writing any
+code in `api/src/popacta/domain/` — it locks the decisions that otherwise diverge.
+
 - Draft seat; snake order; pick numbers **derived from position**, not counted with `max()+1`
 - Safe undo — the old global counter left permanent holes in the sequence
 - Roster slots as position-eligibility sets (superflex-capable)
 - Your roster and its unfilled needs
 - **Picks until your next turn** — the keystone the whole decision engine hangs off
+
+**Wave 0 done (2026-07-31):** Sleeper league/draft payloads pinned as test fixtures;
+`positions.py` and `league.py` implemented and tested against them; `snake.py`, `draft.py`,
+`roster.py` and `errors.py` written as signatures for parallel implementation.
 
 ### Phase 2 — Decision engine *(~4 days)*
 
@@ -219,7 +230,6 @@ dense rather than glanceable.
 - Sleeper sync: pull `roster_positions` and `scoring_settings` from the real league
 - FantasyPros **Half-PPR preset** projection import (scoring verified standard — no stat-level
   export needed); must include **bye weeks**, which last year's import silently defaulted to 0
-- **DST projections** — required starter, absent from last year's data entirely
 - Superflex ADP import
 - Load real data; dry run
 
@@ -257,8 +267,9 @@ But **the export variant matters more than first assumed**, in two ways the earl
 - The cheat-sheet variant carries **no `ADP` and no `Std Dev` column** in either 1QB or superflex
   form — only a rank delta. Survival probability still needs the variant with
   `Best / Worst / Avg / Std Dev / ADP`. **BLK-1 stays open.**
-- The superflex export **drops DST and K entirely**, so it did not close BLK-2 — it removed the
-  DST list the 1QB export had.
+- The superflex export **drops DST and K entirely**. Initially read as a regression; it is not.
+  Defenses are streamed and there is no K slot, so QB/RB/WR/TE is exactly the ranked universe and
+  BLK-2 closed by decision the same day.
 
 Detail in [open-issues.md](open-issues.md) (BLK-1, BLK-2) and
 [reference_fantasypros_exports.md](reference_fantasypros_exports.md). Re-pull within a few days

@@ -63,6 +63,8 @@ local diverge, CI stops being evidence of anything.
 ## Documentation map — read on demand
 
 - **Planning, prioritising, or asking "what's next"?** → `docs/roadmap.md`
+- **Writing anything in `api/src/popacta/domain/`?** → `docs/plan_phase1_domain_core.md`
+  (locked contracts — read it before the code, not after)
 - **Triaging a bug, or about to repeat a 2025 mistake?** → `docs/open-issues.md`
 - **Need the system shape, the dev environment, or platform gotchas?** → `docs/architecture.md`
 - **Working on draft recommendations, VORP, ADP, or survival math?** → `docs/FeatureDescription_PickAdvisor.md`
