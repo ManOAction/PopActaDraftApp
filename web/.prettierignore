@@ -1,0 +1,10 @@
+dist
+node_modules
+screenshots
+package-lock.json
+
+# Markdown is hand-authored prose here and is NOT prettier-managed anywhere else in
+# the repo (root CLAUDE.md, api/CLAUDE.md, docs/*.md are all outside prettier's reach).
+# Letting it reformat only this directory's markdown would rewrite `*emphasis*` to
+# `_emphasis_` and repad every table, leaving context files inconsistent repo-wide.
+*.md

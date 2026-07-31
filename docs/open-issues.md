@@ -14,10 +14,39 @@ reproducing.
 
 | ID | Issue | Blocks | Owner |
 | --- | --- | --- | --- |
-| BLK-1 | **Rankings CSV export not yet pulled.** Need the FantasyPros *rankings* export (not projections) set to Half PPR + superflex/"OP". Supplies ADP, `Std Dev`, `Tier`, `Bye`. | Survival probability, tier detection, bye weeks | Jacob |
-| BLK-2 | **No DST projections.** `DEF` is a required starter and no source is identified. Low variance, so a rough list suffices. | Complete board | Jacob |
+| BLK-1 | **Rankings export pulled, but it is the wrong variant — still blocking.** See below. | Survival probability, tier detection, bye weeks | Jacob |
+| BLK-2 | **No DST data at all in the current exports.** The superflex ("OP") rankings file covers QB/RB/WR/TE only. `DEF` is a required starter. Needs both an ordering *and* projected points — low variance, so a rough source suffices. | Complete board, VORP for DEF | Jacob |
 | BLK-3 | **Draft slot unknown.** Sleeper's `draft_order` is not yet populated for draft `1385689586394488832`. | Next-pick math uses a placeholder until set | Sleeper |
-| BLK-8 | **`npm install` fails on the Google Drive path.** Exits 13 with `EBADF: bad file descriptor, write` while writing `web/node_modules`. Drive's sync layer does not survive npm's write pattern. `uv sync` on the same path succeeded, so this is npm-specific, not a general filesystem failure. Repo is being relocated off Drive. | All `web/` work — scaffold, Tailwind, shadcn, Playwright | Jacob |
+
+### BLK-1 detail — what was pulled, and what is still missing
+
+`data/fantasypros/FantasyPros_2026_Draft_OP_Rankings.csv` (768 rows), pulled 2026-07-31.
+
+**The superflex half is solved.** Verified: the top 6 overall are all QBs (Allen, Jackson, Maye,
+Burrow, Daniels, Hurts) and 13 of the top 24 are QBs. That is what superflex ordering looks like;
+the earlier 1QB export had its first QB at overall rank 26. Use this file, not a standard one.
+
+**The ADP half is not.** This is the **draft cheat-sheet variant**, whose header is:
+
+```
+RK, TIERS, PLAYER NAME, TEAM, POS, BYE, UPSIDE, BUST, SOS, ECR VS ADP, AVG. DIFF, % OVER
+```
+
+There is **no `ADP` column and no `Std Dev` column**. `ECR VS ADP` is an integer *rank delta* and
+`AVG. DIFF` is not a rank standard deviation. Survival probability needs an absolute ADP **and its
+variance**; neither is recoverable from these columns.
+
+**What to pull:** same Half PPR + Superflex ("OP") settings, but the export variant that carries
+**`Best / Worst / Avg / Std Dev / ADP`**.
+
+**Usable today, without the re-pull:** `RK` gives a superflex consensus ordering, `TIERS` and
+`BYE` are complete (0 missing across all 768 rows), and `POS` carries positional rank. **Bye weeks
+can be imported from this file now** — that closes the LEG-4 gap independently of the ADP problem.
+
+**Watch out — this export drops DST and K.** Positions present are QB (63), RB (242), WR (294),
+TE (169) only. The superseded 1QB "ALL" export *did* include 32 DST and 29 K rows. **DEF is a
+required starter**, so keep a DST-bearing export alongside this one rather than replacing it. See
+BLK-2.
 
 ---
 
@@ -62,3 +91,4 @@ All confirmed by reading `legacy/` or last year's `app.db`. Each shipped.
 | BLK-5 | Unclear whether league scoring differed from FantasyPros defaults | 2026-07-31 | Recomputed `FPTS` from raw stats for all 518 players; max deviation 0.62 pts, all rounding. Offensive scoring is identical to default Half PPR. DST unverified — still custom. |
 | BLK-6 | Whether the FantasyPros API could replace the CSV loader | 2026-07-31 | **No.** Free tier caps every endpoint at 10 rows (10 of 768 rankings, 10 of 8,509 players). Full access prohibitively expensive. CSV export it is. |
 | BLK-7 | Whether to build draft-day notifications | 2026-07-31 | Not building. Slow draft (1hr timer) and Sleeper already notifies. |
+| BLK-8 | `npm install` failed with `EBADF` on the Google Drive path | 2026-07-31 | **Repo relocated to `C:\Projects\PopActaDraftApp`.** `npm install` there succeeds — 184 packages, exit 0, ~27s. The Drive sync layer was the entire cause; nothing in the repo needed changing. `web/` is scaffolded and CI is green. |

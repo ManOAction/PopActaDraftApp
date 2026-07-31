@@ -60,8 +60,8 @@ you're on the clock, so this app does not.
 
 | Path | Role | Notes |
 | --- | --- | --- |
-| `api/` | Backend (Python/FastAPI) | **Empty scaffold.** |
-| `web/` | Frontend (React/TS/Vite/Tailwind/shadcn) | **Empty scaffold.** |
+| `api/` | Backend (Python/FastAPI) | **Toolchain only** — `src/popacta/` is an empty package. |
+| `web/` | Frontend (React/TS/Vite/Tailwind/shadcn) | **Scaffold** — builds and renders a placeholder. |
 | `data/fantasypros/` | Projection CSV exports | Committed — small, and reproducibility matters |
 | `analytics/` | NFL scraper + ELO | Parked; `analytics/CLAUDE.md` |
 | `infra/` | Compose + Caddy | Not yet written |
@@ -79,19 +79,26 @@ Nothing runs yet. Commands go in root `CLAUDE.md` **in the same commit that intr
 | OS | Windows 11 Pro (26200) |
 | Shells | PowerShell 7 (primary), Git Bash (POSIX) — each needs its own syntax |
 | Python | 3.13, at `C:\Program Files\Python313` |
-| Repo path | `G:\My Drive\Repos\PopActaDraftApp` — **on Google Drive** |
+| Node | 24.x, npm 11.x |
+| Repo path | `C:\Projects\PopActaDraftApp` |
 | Editor | VS Code |
 
 ### Platform gotchas
 
 These have each already cost time. They are not hypothetical.
 
-**The repo lived on Google Drive, and is being moved off it (2026-07-31).** The path contained a
-space (`My Drive`), so every shell command needed quoting. Worse, `npm install` **fails outright**
-there — exit 13, `EBADF: bad file descriptor, write`, partway through writing `web/node_modules`.
-Drive's sync layer does not survive npm's write pattern. `uv sync` on the same path succeeded, so
-this is npm-specific rather than a general filesystem failure. Tracked as BLK-8 in
-[open-issues.md](open-issues.md).
+**Do not put this repo on Google Drive.** It lived at `G:\My Drive\Repos\PopActaDraftApp` until
+2026-07-31, where `npm install` **failed outright** — exit 13, `EBADF: bad file descriptor,
+write`, partway through writing `web/node_modules`. Drive's sync layer does not survive npm's
+write pattern. (`uv sync` on the same path succeeded, so it was npm-specific.) The path also
+contained a space, so every shell command needed quoting. Relocating to `C:\Projects\` fixed it
+with no repo change — BLK-8, closed in [open-issues.md](open-issues.md).
+
+**On Windows, `child.kill()` does not kill a process tree.** `web/scripts/screenshot.ts` spawns a
+Vite dev server; killing only the direct child left an orphan per run, and those orphans held
+`lightningcss.win32-x64-msvc.node` open until `npm ci` died with `EPERM: unlink`. Kill the tree —
+`taskkill /pid <pid> /T /F` on Windows, the process group on POSIX — and handle SIGINT, which
+bypasses `finally`. Any future tooling that spawns a server needs the same treatment.
 
 **`.venv/` and `node_modules/` do not survive a move.** Both hardcode absolute paths, and both are
 gitignored, so git does not carry them. After relocating, delete any copies and reinstall — don't
@@ -120,8 +127,9 @@ fails on untracked paths — `docs/` was untracked during the relayout and neede
 - **Verify before asserting.** This project has already been wrong about the FantasyPros API tier
   limit, the CSV column order, and whether the league's scoring was custom. All three were
   settled by running something, not by reasoning about it.
-- **Check that code exists before referencing it.** `api/` and `web/` are empty. Docs describing
-  planned behaviour are labelled with a status line; treat unlabelled description as aspiration.
+- **Check that code exists before referencing it.** `api/` is a toolchain with an empty package;
+  `web/` is a scaffold with a placeholder screen. Docs describing planned behaviour are labelled
+  with a status line; treat unlabelled description as aspiration.
 
 ### Secrets
 

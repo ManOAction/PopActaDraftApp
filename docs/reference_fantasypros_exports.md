@@ -1,8 +1,8 @@
 # Reference — FantasyPros CSV exports
 
-Validated 2026-07-31 against the exports in `scripts/data/FantasyProsExports/`
-(pulled 2026-07-31 for the 2026 season). Durable facts about the file format and how it
-relates to Pop Acta Premier League scoring.
+Validated 2026-07-31 against the exports now in `data/fantasypros/` (pulled 2026-07-31 for the
+2026 season). Durable facts about the file format and how it relates to Pop Acta Premier League
+scoring.
 
 ## Scoring is already correct — verified, not assumed
 
@@ -76,6 +76,45 @@ A separate **rankings** export is required for those — set to **Half PPR** and
 - `Bye` — absent here; last year's import silently defaulted every bye week to 0
 
 **DST projections are also missing** and must be sourced separately. DEF is a required starter.
+
+## The rankings export — variants matter more than expected
+
+Two different rankings exports were pulled on 2026-07-31, and the differences between them are
+the whole story. Both are the **draft cheat-sheet** variant, sharing this header:
+
+```
+RK, TIERS, PLAYER NAME, TEAM, POS, BYE, UPSIDE, BUST, SOS, ECR VS ADP, AVG. DIFF, % OVER
+```
+
+| | 1QB ("ALL") | Superflex ("OP") — kept |
+| --- | --- | --- |
+| rows | 732 | 768 |
+| first QB, overall rank | **26** | **1** |
+| QBs in top 24 | 1 | **13** |
+| DST / K rows | 32 / 29 | **none** |
+
+Three durable facts:
+
+**1. The scoring/format setting silently changes the whole ordering.** The 1QB file put Josh Allen
+at overall rank 26; the superflex file has QBs at 1–6. Feeding the 1QB file into a superflex
+league makes every QB decision wrong in the same direction.
+
+> **Import-time integrity check:** if the first QB is not inside roughly the top 5 overall, the
+> file is not a superflex export. Reject it and say so — do not import it.
+
+**2. Neither variant has `ADP` or `Std Dev`.** `ECR VS ADP` is an integer *rank delta* and
+`AVG. DIFF` is not a standard deviation. Survival probability needs absolute ADP **and** its
+variance, so a different export variant — the one carrying
+`Best / Worst / Avg / Std Dev / ADP` — is still required. Tracked as BLK-1 in
+[open-issues.md](open-issues.md).
+
+**3. The superflex export drops DST and K entirely.** Positions are QB/RB/WR/TE only. `DEF` is a
+required starter in this league, so a DST source has to come from somewhere else — keep the
+DST-bearing export alongside rather than replacing it (BLK-2).
+
+What *is* good in the superflex file: `RK` as a consensus superflex ordering, positional rank
+inside `POS`, and **`TIERS` and `BYE` complete on all 768 rows** — enough to import bye weeks
+today and close the LEG-4 gap without waiting on the ADP re-pull.
 
 ## Why not the FantasyPros API
 

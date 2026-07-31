@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(npm run *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(python -)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId, ParentProcessId, @{n='Cmd';e={$_.CommandLine.Substring\\(0, [Math]::Min\\(120, $_.CommandLine.Length\\)\\)}} | Format-Table -AutoSize -Wrap)",
+      "Bash(npm install *)"
     ]
   }
 }

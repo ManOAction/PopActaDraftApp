@@ -148,37 +148,36 @@ three days, cut and move on.
 - [x] `api/` Python toolchain: `uv` + `ruff` + `pytest`, **verified green** — see Commands in
       root [`CLAUDE.md`](../CLAUDE.md). `api/uv.lock` committed.
 
-**Remaining:**
+**Also done (2026-07-31, after relocation to `C:\Projects\PopActaDraftApp`):**
 
-- [ ] `web/` scaffold — Vite + React + TS + Tailwind v4, shadcn-ready. **Blocked by BLK-8**
-      (`npm install` fails with `EBADF` on the Drive path).
-- [ ] Browser automation for the design feedback loop. Blocked behind the `web/` scaffold.
-- [ ] Python and TypeScript style rules as `api/CLAUDE.md` and `web/CLAUDE.md`
-- [ ] Custom sub-agents in `.claude/agents/`: design reviewer (browser + screenshot), draft-logic
-      verifier, test writer
-- [ ] GitHub Actions green on push (`origin` is `github.com/ManOAction/PopActaDraftApp`, so this
-      will genuinely run — unlike LEG-11's fictional infrastructure)
-- [ ] Rewrite `README.md` — it still describes the 2025 app, its stack, and a Let's Encrypt setup
-      that never existed
+- [x] **BLK-8 closed.** `npm install` succeeds at the new path — 184 packages, exit 0. The Google
+      Drive sync layer was the entire cause; no repo change was needed.
+- [x] `web/` scaffold — Vite 8 + React 19 + TS + Tailwind v4 + shadcn-ready. Builds, lints,
+      typechecks, formats clean. **TypeScript pinned to `~6.0.3`**: TS 7 is out, but
+      `typescript-eslint@8` still declares `typescript <6.1.0`, so TS 7 would mean no type-aware
+      linting. Revisit once typescript-eslint supports it.
+- [x] Browser automation — `npm run screenshot` boots the dev server, captures mobile + desktop,
+      and **exits non-zero on any console or page error**, so it doubles as a render smoke test.
+- [x] `api/CLAUDE.md` and `web/CLAUDE.md` — area rules + language style, each citing the `LEG-*`
+      defect it exists to prevent
+- [x] Sub-agents in `.claude/agents/`: `design-reviewer`, `draft-logic-verifier`, `test-writer`
+- [x] GitHub Actions (`.github/workflows/ci.yml`) — three jobs (api, web, design-loop), running
+      the same commands as the docs. Every step verified locally before pushing.
+- [x] `README.md` rewritten for the 2026 rebuild
 
-### Resume here after the repo is relocated
+**Phase 0 is complete.** Next: Phase 1.
 
-The repo is moving off Google Drive because of BLK-8. `.venv/` and `node_modules/` are gitignored
-and therefore do **not** travel with git — which is correct, because both hardcode absolute paths
-and would be broken at the new location anyway.
+**Toolchain traps found while verifying** — recorded because they are exactly the class of silent
+misconfiguration this project keeps losing time to:
 
-At the new path:
-
-1. Delete any copied `api/.venv` and `web/node_modules` — they hold the old `G:\My Drive\...` paths.
-2. `uv sync --project api`, then re-verify with the Commands table in root `CLAUDE.md`.
-3. Retry the `web/` scaffold install. If it succeeds, close BLK-8 with the resolution.
-
-**Toolchain trap found while verifying** (recorded here because it is exactly the class of silent
-misconfiguration this project keeps losing time to): `uv run --project api pytest` with **no path
-argument** sets rootdir to the repo root, finds no config file, and silently ignores
-`api/pyproject.toml`'s `[tool.pytest.ini_options]` — including `--strict-config`. Tests still
-appear to pass. `uv run --project api pytest api` sets rootdir to `api/` and loads the config.
-Always pass the path.
+1. `uv run --project api pytest` with **no path argument** sets rootdir to the repo root, finds no
+   config file, and silently ignores `api/pyproject.toml`'s `[tool.pytest.ini_options]` —
+   including `--strict-config`. Tests still appear to pass. Always pass the path:
+   `uv run --project api pytest api`.
+2. On Windows, `child.kill()` does **not** kill a process tree. The first screenshot script leaked
+   a Vite server per run; the orphans held `lightningcss.win32-x64-msvc.node` open and made
+   `npm ci` fail with `EPERM`. Fixed by killing the tree (`taskkill /T /F`, or the process group
+   on POSIX). Any future spawned-process tooling needs the same treatment.
 
 ### Phase 1 — Domain core *(~3 days)*
 
@@ -246,11 +245,21 @@ Half-PPR on 2026-07-31. Removed the scoring engine from Phase 2 (~1 day recovere
 
 ## Open questions
 
-- **`pick_timer` is 3600s (1 hour).** Is this a slow draft over days rather than a live room? If
-  so, Phase 3 inverts: tap-speed stops mattering, on-the-clock notification becomes the top
-  feature, and the analysis can be deliberative rather than glanceable.
-- Your draft slot (Sleeper's `draft_order` is not yet populated)
+- Your draft slot (Sleeper's `draft_order` is not yet populated) — BLK-3
 
-**Closed 2026-07-31:** superflex ADP and DST projections both resolve via the FantasyPros web
-export — set scoring to Half PPR and rankings to superflex/"OP". Pull the export within a few
-days of 2026-08-28, since ADP moves through August.
+**Closed 2026-07-31:** the 1-hour `pick_timer` does mean a slow draft over days, so Phase 3 is
+deliberative rather than glanceable and notifications are not built (BLK-7).
+
+**Sharpened 2026-07-31:** the FantasyPros web export does supply superflex rankings — the
+Superflex ("OP") file is in `data/fantasypros/` and is verifiably correct (QBs at overall 1–6).
+But **the export variant matters more than first assumed**, in two ways the earlier note missed:
+
+- The cheat-sheet variant carries **no `ADP` and no `Std Dev` column** in either 1QB or superflex
+  form — only a rank delta. Survival probability still needs the variant with
+  `Best / Worst / Avg / Std Dev / ADP`. **BLK-1 stays open.**
+- The superflex export **drops DST and K entirely**, so it did not close BLK-2 — it removed the
+  DST list the 1QB export had.
+
+Detail in [open-issues.md](open-issues.md) (BLK-1, BLK-2) and
+[reference_fantasypros_exports.md](reference_fantasypros_exports.md). Re-pull within a few days
+of 2026-08-28, since ADP moves through August.
