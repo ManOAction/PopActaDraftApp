@@ -136,6 +136,56 @@ Two further parsing notes for this file specifically:
   That makes rank useless as a clustering axis — there are no gaps in it to find. Cluster on
   projected points instead. See `docs/plan_phase2_decision_engine.md`.
 
+## The ADP export — a third file, a different shape, five traps
+
+`FantasyPros_2026_Superflex_ADP_Rankings.csv`, pulled 2026-08-01. **278 rows.** This is the *ADP*
+page, not the rankings page, and its format resembles neither of the others.
+
+```
+OP,Overall,Player (Bye),Sleeper,FFPC,AVG,Real-Time
+1,22,Josh Allen   BUF (7),1,2,1.5,3
+```
+
+It genuinely is superflex: Josh Allen sits at `OP` 1 with `Sleeper` ADP 1. Coverage is complete
+across the 160-pick window — `AVG` is present on all 278 rows, and the top-160 `AVG` values run
+**1.5 … 164.0**, confirming ADP is on the same scale as pick numbers rather than an
+offence-only board that would compress well below 160.
+
+> ### Trap 1 — `Overall` is the 1QB rank, sitting right beside the superflex one
+>
+> `OP` is the **superflex** ADP rank. `Overall` is the **1QB** rank. Josh Allen is `OP` 1 and
+> `Overall` 22. Both columns are in the same file, adjacent, neither labelled "superflex".
+>
+> **Reading `Overall` silently reintroduces the exact bug this project has now guarded against
+> three times.** Key on `OP`. Assert that the top of `OP` is QB-heavy at import.
+
+**Trap 2 — missing values are an EM DASH (`—`, U+2014), not `-` and not empty.** The file is
+valid UTF-8. A parser testing for `'-'` or `''` will treat em dashes as data and `float()` will
+raise, or worse, a `.replace('-','')` will silently produce nonsense. Note the console renders
+`—` as `?` because it is cp1252 — see the platform gotchas in
+[architecture.md](architecture.md). Do not "fix" the file's encoding on the basis of that display.
+
+**Trap 3 — `Player (Bye)` is a composite field.** `'Josh Allen   BUF (7)'` — name, **multiple
+spaces**, team, then the bye in parentheses. Split on a 2-or-more-space run, not a single space.
+
+**Trap 4 — three rows carry a name only.** `Stefon Diggs`, `Tyreek Hill`, `Joe Mixon` have no team
+and no bye (free agents). The parser must accept a name-only field rather than raising.
+
+**Trap 5 — `AVG` excludes `Real-Time`.** Verified on all 278 rows: `AVG == mean(Sleeper, FFPC)`,
+and where `FFPC` is missing, `AVG == Sleeper`. `Real-Time` is a third, separate source that is
+*not* folded in. Do not assume `AVG` is the mean of everything on the row.
+
+### What it still does not contain
+
+**No `Std Dev`, and no `Best`/`Worst`/range column.** Survival probability needs ADP *and its
+variance*; this supplies only the first. BLK-1 stays open for the dispersion half.
+
+The two independent sources (`Sleeper`, `FFPC`) give a cross-platform spread, and it does behave
+the way a real dispersion measure should — median `|Sleeper − FFPC|` is **4.0** for ADP ≤ 40 and
+**15.0** for ADP > 100, so spread grows with ADP. Useful as a **shape sanity check**; not a
+substitute for `Std Dev`. It measures disagreement between two platforms with different formats,
+not draft-to-draft variance within one, and two points cannot estimate a standard deviation.
+
 ## Why not the FantasyPros API
 
 The free API tier caps **every** endpoint at 10 rows (`public_api_limited: true`) — 10 of 768

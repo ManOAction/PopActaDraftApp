@@ -92,6 +92,17 @@ cycle* below — this is the first knob.
 **Not an artefact of a bloated projection set:** 28 QBs are projected ≥450 pass attempts, and the
 cliff falls at QB29→QB30 (223 → 193), exactly where draft demand lands.
 
+> **Confirmed against real market ADP, 2026-08-01.** The superflex ADP export
+> (`FantasyPros_2026_Superflex_ADP_Rankings.csv`) puts **32 QBs inside the top 160** — measured
+> from actual draft data rather than estimated from consensus rank, which had given 29. Draft
+> demand is therefore *validated and slightly strengthened*: `r_QB` becomes `QB33`, a marginally
+> lower baseline than the `QB30` this decision was made on. **This closes open question 5 below.**
+>
+> One nuance worth carrying into the UI: the market takes **8** QBs in the top 24, while expert
+> superflex consensus ranks **13** there. The market is *less* QB-eager early than the experts.
+> That gap is the same phenomenon as the +7.5 median QB `ECR VS ADP` delta measured earlier, and
+> it is precisely what the starter-demand sensitivity band exists to surface.
+
 ### 3. `Plan(p)` is the ranking axis, and the baseline is **added**
 
 ```
@@ -357,19 +368,30 @@ than a refactor.
 the score. Decision 11 (each signal enters exactly once) is not configurable — that is the
 invariant that keeps the number explainable, and explainability is a draft-day requirement.
 
-## Open questions genuinely blocked on ADP
+## Open questions — status after the ADP export landed (2026-08-01)
 
-Re-validate all five the day the BLK-1 export lands:
+**Closed:**
 
-1. **Is `sd` monotone in `ADP`?** If `Std Dev` is flat in absolute picks, the survival curve — and
-   the whole `B(p)` ordering — changes shape.
-2. **Does `Σ(1−s) ≈ k` hold?** Synthetic data runs 2–9% hot. If real data is far off, `σ` is
-   miscalibrated and a moment-matching rescale becomes mandatory rather than a check.
-3. **Does the horizon `r_pos` reproduce the count-based one?** They agree within 3 points for QB on
-   synthetic data and diverge by 39 for RB. If they disagree badly, prefer the count-based form —
-   it is directly observable.
-4. **Players with no ADP** enter `B(p)` with certainty. Harmless because their `u` is low, but
-   assert that no top-30-by-`u` player is missing ADP.
-5. **Does the market really take 29 QBs?** *The draft-demand decision rests entirely on this
-   count.* Re-derive it from the re-pulled export, and again from the mock-draft rehearsal — that
-   rehearsal is the only place this number gets ground-truthed before draft day.
+- ~~5. Does the market really take 29 QBs?~~ **It takes 32.** Measured on real superflex ADP.
+  Draft demand confirmed; `r_QB = QB33`. Still worth re-deriving from the mock-draft rehearsal
+  (OPEN-2), which remains the only true ground-truth before draft day.
+- ~~3a. Is ADP on the same scale as `picks_made`?~~ **Yes.** Top-160 `AVG` runs 1.5 … 164.0, so no
+  rescale is needed. An offence-only board would have compressed well below 160.
+- ~~4. Players with no ADP.~~ **Coverage is complete** across the draftable window — `AVG` is
+  present on all 278 rows. Keep the assertion anyway; it costs nothing and guards the re-pull.
+
+**Still open — all four now blocked specifically on `Std Dev`, not on ADP:**
+
+1. **Is `sd` monotone in `ADP`?** The cross-source spread says yes in shape — median
+   `|Sleeper − FFPC|` is 4.0 at ADP ≤ 40 and 15.0 at ADP > 100 — but that measures platform
+   disagreement, not draft-to-draft variance, and cannot set a magnitude.
+2. **Does `Σ(1−s) ≈ k` hold?** Unanswerable without real `σ`. This remains the mandatory
+   calibration assertion.
+3. **Does the horizon `r_pos` reproduce the count-based one?** Needs survival, therefore `σ`.
+   Prefer the count-based form if they disagree — it is directly observable, and it is now
+   directly *measured* rather than inferred.
+6. **What supplies `Std Dev`?** New. The ADP export does not carry it and neither does the
+   cheat-sheet rankings export. The remaining candidate is the FantasyPros **ECR rankings** export
+   variant with `Best / Worst / Avg / Std Dev` columns. Until one arrives, the honest options are
+   (a) pull that variant, or (b) model `σ = f(ADP)` — which means inventing a coefficient, exactly
+   the move that produced LEG-1 and LEG-5. **Prefer (a).**

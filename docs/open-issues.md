@@ -14,10 +14,30 @@ reproducing.
 
 | ID | Issue | Blocks | Owner |
 | --- | --- | --- | --- |
-| BLK-1 | **Rankings export pulled, but it is the wrong variant — still blocking.** See below. | Survival probability, tier detection, bye weeks | Jacob |
+| BLK-1 | **ADP solved 2026-08-01; `Std Dev` still missing.** See below. | Survival probability only — tiers, bye weeks and replacement levels are now unblocked | Jacob |
 | BLK-3 | **Draft slot unknown.** Sleeper's `draft_order` is not yet populated for draft `1385689586394488832`. | Next-pick math uses a placeholder until set | Sleeper |
 
-### BLK-1 detail — what was pulled, and what is still missing
+### BLK-1 update, 2026-08-01 — ADP landed, dispersion did not
+
+`FantasyPros_2026_Superflex_ADP_Rankings.csv` (278 rows) supplies **real superflex ADP**: Josh
+Allen at `OP` 1, complete coverage of the 160-pick window, and on the same scale as pick numbers
+(top-160 values run 1.5 … 164.0).
+
+**What it unblocked immediately:** the draft-demand replacement basis is now confirmed against
+market data rather than consensus rank — **32 QBs go inside the top 160**, versus the 29 estimated
+earlier. Replacement level, the lineup DP, tier detection and bye-week import are all unblocked.
+
+**What is still blocked:** the file carries **no `Std Dev`** and no `Best`/`Worst` columns.
+Survival probability needs ADP *and* its variance, so it — and the `Plan` assembly that consumes
+it — remain blocked. The remaining candidate source is the FantasyPros **ECR rankings** export
+variant carrying `Best / Worst / Avg / Std Dev`. Modelling `σ = f(ADP)` instead would mean
+inventing a coefficient, which is how LEG-1 and LEG-5 happened; prefer pulling the file.
+
+Five parsing traps in this export — including an `Overall` column that is the **1QB** rank sitting
+beside the superflex `OP` — are documented in
+[reference_fantasypros_exports.md](reference_fantasypros_exports.md).
+
+### BLK-1 detail — the earlier cheat-sheet export
 
 `data/fantasypros/FantasyPros_2026_Draft_OP_Rankings.csv` (768 rows), pulled 2026-07-31.
 
