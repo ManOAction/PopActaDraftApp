@@ -97,17 +97,54 @@ You're on the clock at pick `n_now`; your next pick is `n_next`. For a player `p
 `r`:
 
 ```
-VONA(p) = F(p) − E[ max { F(q) : q fills r, q available at n_next } ]
+VONA(p) = F(p) − E[ max { F(q) : q fills r, q available at n_next } ]      # WRONG — see below
 ```
 
-The expectation is taken over survival probabilities of every other candidate for that role. In
-words: *the value of taking him now, minus the value of the best replacement you'd realistically
-still be able to get.*
+> ### ⚠ Corrected 2026-07-31 — this formula ranks backwards
+>
+> The baseline must be **added**, not subtracted. As written, the formula recommends the player
+> you should *not* take.
+>
+> Because the expectation excludes `p`, the baseline is a function of `p`: removing a
+> likely-to-survive player leaves a weak fallback, and removing a certain-to-be-gone player
+> leaves a strong one. Subtracting it therefore penalises exactly the player you must take now.
+>
+> Three players at the same role, `(points, survival to your next pick)`:
+> `A = (250, 0.05)`, `B = (262, 0.80)`, `C = (210, 0.90)`.
+>
+> | | baseline `E[max others]` | `F − baseline` (this doc) | `F + baseline` (correct) |
+> | --- | --- | --- | --- |
+> | A | 247.40 | 2.60 | **497.40** |
+> | B | 192.05 | **69.95** | 454.05 |
+>
+> Take A and you score 250 now plus a 247.4 fallback = 497.4. Take B and you score 262 now plus
+> a 192.1 fallback = 454.1. **A is correct**, and the formula above picks B. Note the two
+> expressions share both terms and differ only in the sign, so they rank oppositely whenever the
+> baseline varies more than the projection does — which is most of the draft.
+>
+> The worked example below reaches the *right* answer only because it hand-assigns each player a
+> different baseline (210 vs 258) instead of computing both from one shared candidate pool. That
+> assumption encodes the conclusion; it is not derived.
+>
+> **The corrected form** — expected starting-lineup points across your next two picks:
+>
+> ```
+> Plan(p)            = u(p | roster) + E[ max { u(q | roster ∪ {p}) · survives(q) } ]
+> cost_of_passing(p) = max_p' Plan(p') − Plan(p)      # the number to display
+> ```
+>
+> where `u(p | roster)` is `p`'s marginal contribution to your starting lineup rather than raw
+> points — which is also what makes values comparable across positions in superflex. Full
+> derivation, the replacement-level definition, and the superflex demand calculation are in
+> [`plan_phase2_decision_engine.md`](plan_phase2_decision_engine.md).
+>
+> Keep this section as written, with the correction attached. The error is instructive: it is the
+> same shape as LEG-5 — a plausible formula, computing cleanly, answering the wrong question.
 
 Then:
 
 ```
-priority(p) = VONA(p), restricted to roles you still need to fill
+priority(p) = Plan(p), restricted to roles you still need to fill
 ```
 
 **This is the number the board sorts on.**
