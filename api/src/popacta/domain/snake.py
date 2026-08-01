@@ -11,6 +11,7 @@ __all__ = [
     "next_pick_for_seat",
     "pick_number",
     "picks_until_next_turn",
+    "picks_until_nth_turn",
     "round_and_seat",
     "seat_picks",
 ]
@@ -166,7 +167,39 @@ def picks_until_next_turn(
         DraftRangeError: `seat` outside `1..teams`, or `picks_made` negative, or
             `picks_made` greater than the `teams * rounds` picks the draft contains.
     """
-    next_mine = next_pick_for_seat(seat, picks_made, teams, rounds, reversal_round)
-    if next_mine is None:
+    return picks_until_nth_turn(seat, picks_made, teams, rounds, 1, reversal_round)
+
+
+def picks_until_nth_turn(
+    seat: int, picks_made: int, teams: int, rounds: int, n: int = 1, reversal_round: int = 0
+) -> int | None:
+    """How many picks OTHER teams make before `seat`'s **n-th** upcoming pick.
+
+    A strict generalization of `picks_until_next_turn`, which is exactly `n = 1`.
+
+    Phase 2 needs `n = 2` in two places, and both are real. **At the turn a seat picks
+    back-to-back** — seat 10 picks at 10 and 11 — so `n = 1` returns `0` for both and a
+    two-pick lookahead is the only thing that distinguishes them; the useful question
+    there is "which of these two first, given what survives to my pick after that?" The
+    replacement-level horizon also needs the distance to a later pick, not the next one.
+
+    Subtracting `n` is what makes this count *other* teams' picks: your own `n` picks in
+    the window are not competition for you.
+
+    Returns `None` when the seat has fewer than `n` picks left.
+
+    Raises:
+        DraftRangeError: `seat` outside `1..teams`, `picks_made` negative or beyond the
+            end of the draft, or `n` below 1.
+    """
+    if n < 1:
+        raise DraftRangeError(f"n must be at least 1, got {n}")
+
+    # Delegated so the seat/round/picks_made bounds live in exactly one place.
+    if next_pick_for_seat(seat, picks_made, teams, rounds, reversal_round) is None:
         return None
-    return next_mine - picks_made - 1
+
+    remaining = [p for p in seat_picks(seat, teams, rounds, reversal_round) if p > picks_made]
+    if len(remaining) < n:
+        return None
+    return remaining[n - 1] - picks_made - n

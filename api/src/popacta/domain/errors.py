@@ -29,6 +29,18 @@ class LeagueConfigError(DraftError, ValueError):
     """
 
 
+class ImportDataError(DraftError, ValueError):
+    """A source file could not be parsed into usable data.
+
+    Raised by the ingest layer for an unexpected column layout, an unparseable value, a
+    player that resolves to no Sleeper id or to several, or a file that fails an
+    integrity check (for example a rankings export that turns out not to be superflex).
+
+    Every one of these must surface at **import** time, days before the draft. LEG-4
+    shipped because a parse failure was caught and defaulted to `0`.
+    """
+
+
 class InvalidPlayerError(DraftError, ValueError):
     """A player id or position was not usable.
 
