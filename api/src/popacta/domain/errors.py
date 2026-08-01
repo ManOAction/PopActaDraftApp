@@ -17,6 +17,27 @@ class DraftRangeError(DraftError, ValueError):
     """
 
 
+class LeagueConfigError(DraftError, ValueError):
+    """The league or draft payload could not be turned into a usable configuration.
+
+    Raised for an unrecognised roster slot, a non-snake draft, a structural value out of
+    range, or the two Sleeper payloads disagreeing with each other. These are all "the
+    league changed underneath us" failures, and they must surface at import time — days
+    before the draft — rather than as a wrong number during it.
+
+    Subclasses `ValueError` so existing `except ValueError` handlers still behave.
+    """
+
+
+class InvalidPlayerError(DraftError, ValueError):
+    """A player id or position was not usable.
+
+    Covers a missing or non-string player id, and a roster entry whose position is not a
+    `Position` member. The 2025 app absorbed values like these and produced wrong numbers
+    rather than an error (LEG-4).
+    """
+
+
 class DuplicatePickError(DraftError):
     """A player already off the board was drafted again."""
 

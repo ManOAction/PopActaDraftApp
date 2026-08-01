@@ -8,7 +8,24 @@
       "Bash(python -)",
       "PowerShell(Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Select-Object ProcessId, ParentProcessId, @{n='Cmd';e={$_.CommandLine.Substring\\(0, [Math]::Min\\(120, $_.CommandLine.Length\\)\\)}} | Format-Table -AutoSize -Wrap)",
       "Bash(npm install *)",
-      "Bash(uv run *)"
+      "Bash(uv run *)",
+      "Bash(cp api/src/popacta/domain/roster.py __TRACKED_VAR__/roster_backup.py)",
+      "Bash(cp api/src/popacta/domain/roster.py \"C:/Users/jacob/AppData/Local/Temp/claude/c--Projects-PopActaDraftApp/84f549d1-aee4-421f-912d-c55e297dd0c6/scratchpad/roster_backup.py\")",
+      "PowerShell(uv run --project api pytest api/tests/domain/test_draft.py)",
+      "PowerShell(uv run --project api pytest api/tests/domain/test_snake.py)",
+      "PowerShell(uv run --project api ruff format api/src/popacta/domain/draft.py api/tests/domain/test_draft.py)",
+      "PowerShell(uv run --project api ruff check api/src/popacta/domain/draft.py api/tests/domain/test_draft.py)",
+      "PowerShell(uv run --project api ruff check api/src/popacta/domain/snake.py api/tests/domain/test_snake.py)",
+      "PowerShell(uv run --project api ruff format api/src/popacta/domain/snake.py api/tests/domain/test_snake.py)",
+      "PowerShell(uv run --project api pytest api/tests/domain/test_snake.py --tb=no -q)",
+      "PowerShell(uv run --project api pytest api/tests/domain/test_draft.py --tb=no -q)",
+      "PowerShell(uv run --project api pytest api/tests/domain/test_snake.py --tb=no -q 2>&1)",
+      "Bash(cp \"C:/Users/jacob/AppData/Local/Temp/claude/c--Projects-PopActaDraftApp/84f549d1-aee4-421f-912d-c55e297dd0c6/scratchpad/roster_backup.py\" api/src/popacta/domain/roster.py)",
+      "PowerShell(git -C c:/Projects/PopActaDraftApp status --short)",
+      "PowerShell(git -C c:/Projects/PopActaDraftApp diff --stat -- api/src/popacta/domain/draft.py)",
+      "Bash(uv run --project api python -c ' *)",
+      "Bash(export PYTHONPATH=\"C:/Users/jacob/AppData/Local/Temp/claude/c--Projects-PopActaDraftApp/84f549d1-aee4-421f-912d-c55e297dd0c6/scratchpad\")",
+      "Bash(MUTATION=greedy uv run --project api pytest api/tests/domain/test_roster.py -p mutate)"
     ]
   }
 }

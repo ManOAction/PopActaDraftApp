@@ -240,6 +240,7 @@ class Pick:                     # a derived view, never stored
 @dataclass(frozen=True, slots=True)
 class DraftState:
     config: LeagueConfig
+    numbering: SnakeNumbering          # injected — see the note below
     player_ids: tuple[str, ...] = ()
 
     def record(self, player_id: str) -> Self: ...
@@ -260,6 +261,13 @@ class DraftState:
 functions via a small `Protocol` so it is unit-testable against a trivial linear stub. This is
 what lets `draft.py` and `snake.py` be written concurrently.
 
+In production the `snake` **module object itself** is passed as `numbering`; it satisfies the
+Protocol structurally, since `numbering.round_and_seat(pick, teams, reversal_round)` resolves to
+the module-level function. Verified working end to end. Note that a static type checker would
+reject this — a module is not a nominal Protocol instance — so **if mypy is ever added, this is
+the first thing that will complain**, and the fix is a thin adapter class rather than a change to
+the design.
+
 ### `roster.py`
 
 ```python
@@ -275,12 +283,17 @@ def assign_starters(roster: Mapping[str, Position],
 
 > **This is a maximum bipartite matching problem, and greedy is wrong.**
 >
-> Roster `{QB1: QB, RB1: RB}`, open slots `{SUPER_FLEX, RB}`. Greedy in roster order puts `RB1`
-> into `SUPER_FLEX`; then `QB1` fits nothing and the app reports an unfilled slot plus an
-> unplaced player. The correct assignment is `QB1 -> SUPER_FLEX`, `RB1 -> RB`, everything filled.
+> Roster `{RB1: RB, QB1: QB}`, open slots `{SUPER_FLEX, RB}`. Greedy visiting `RB1` first puts it
+> into `SUPER_FLEX`; then `QB1` fits nothing and the app reports an unfilled slot plus an unplaced
+> player. The correct assignment is `QB1 -> SUPER_FLEX`, `RB1 -> RB`, everything filled.
+>
+> **Iteration order is load-bearing** (corrected 2026-07-31 — the original wording here said
+> "greedy in roster order" with the roster written `{QB1, RB1}`, which does *not* reproduce the
+> failure: visiting `QB1` first, player-major greedy reaches the right answer by luck. A test
+> written from that ordering passes against a broken implementation).
 >
 > Use augmenting paths (Hopcroft–Karp is overkill — the graph is ~16 players by ~9 slots).
-> **This counterexample must appear verbatim as a test.**
+> **This counterexample must appear as a test, pinned to the order that strands the QB.**
 
 ---
 
@@ -309,8 +322,15 @@ not widen its scope.
 - `picks_until_next_turn(10, 9) == 0` and `(10, 10) == 0` — the back-to-back turn
 - `picks_until_next_turn(1, 1) == 18`; `picks_until_next_turn(4, 4) == 12`
 - Returns `None` after a seat's final pick
-- Seat 0, seat 11, pick 0, pick 161 all raise
+- Seat 0, seat 11 and pick 0 all raise `DraftRangeError`
 - `reversal_round=3` behaves correctly, even though this league uses 0
+
+> **Corrected 2026-07-31.** This list originally also demanded "pick 161 raises", which has no
+> home in the locked signatures: `round_and_seat(pick, teams, reversal_round)` takes no `rounds`
+> and therefore *cannot* know 161 is past the end of a 160-pick draft. Only `seat_picks`,
+> `next_pick_for_seat` and `picks_until_next_turn` know the draft length. The bound is enforced
+> there — `picks_made > teams * rounds` raises, while `picks_made == 160` stays legal and returns
+> `None`. The criterion was wrong, not the signature.
 
 **B — `roster.py`**
 - The `{QB1, RB1}` / `{SUPER_FLEX, RB}` counterexample above
@@ -328,6 +348,42 @@ not widen its scope.
   raises
 - `roster_for_seat` returns exactly that seat's 16 players
 - Every operation leaves the original state unmutated
+
+## Known limitations — carry these into Phase 2
+
+Surfaced by the adversarial verification pass on 2026-07-31. None is a defect today; each
+is a trap for the phase that consumes this layer.
+
+**`unfilled` is not canonical.** Several maximum matchings can exist, and they can name
+*different* slots as the need — opposite draft advice from the same roster. On a toy
+layout, roster `{RB1, TE1}` with slots `[FLEX.1, RB.1, TE.1]` reports `TE.1` unfilled in one
+insertion order and `RB.1` in the other. **It does not reproduce on this league** (0 cases
+in 60,000 order-permutation trials) because Sleeper lists position-specific slots before
+`FLEX`/`SUPER_FLEX`. It is latent and contingent entirely on slot ordering. Phase 2 will
+read `unfilled` as "needs" — if it ever needs a stable answer, make the tie-break explicit
+rather than relying on the current ordering.
+
+**The production slot order hides the greedy bug.** Verified by mutation testing: swapping
+in naive greedy leaves the *entire* integration suite passing, because with this league's
+real slot order a flex-eligible player only reaches `SUPER_FLEX` once both `FLEX` slots are
+gone, so greedy provably attains a maximum. The counterexample is reachable only with a
+reordered slot list. **The protection against this class of bug lives exclusively in
+`test_roster.py`** — do not "simplify" those reordered-slot tests away.
+
+**`bench` conflates excluded positions with genuine surplus.** Feeding a roster containing
+a `DEF` into `assign_starters(..., ranked_starter_slots)` puts the DEF in `bench`, so
+`len(bench)` overstates bench usage against `bench_count`. Phase 2 must filter to
+`RANKED_POSITIONS` before comparing.
+
+**Two boundary conventions are duplicated rather than delegated.**
+`DraftState.roster_for_seat` re-implements the `1 <= seat <= teams` check, and
+`LeagueConfig.from_sleeper` requires `teams >= 2` while `snake._check_teams` allows
+`teams >= 1`. Harmless — the config is the stricter one — but it is duplicated knowledge.
+
+**Reversal-round semantics are not independently verified.** `test_snake.py`'s board helper
+copies the `_descends` rule from the implementation, so under reversal it would agree with
+a wrong interpretation. Hand-checked against standard third-round reversal and correct.
+`reversal_round` is `0` for this league, so nothing rides on it today.
 
 ## Designed against these Phase 2 consumers
 

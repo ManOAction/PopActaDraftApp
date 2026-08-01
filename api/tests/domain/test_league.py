@@ -156,7 +156,7 @@ def test_repeated_slot_names_get_distinct_ids() -> None:
     """`RB` twice must become two assignable slots, not one slot with a count of 2."""
     config = LeagueConfig.from_sleeper(
         {"roster_positions": ["RB", "RB", "RB", "BN"]},
-        {"settings": {"teams": 10, "rounds": 16, "reversal_round": 0}},
+        {"type": "snake", "settings": {"teams": 10, "rounds": 16, "reversal_round": 0}},
     )
 
     assert [slot.id for slot in config.starter_slots] == ["RB.1", "RB.2", "RB.3"]

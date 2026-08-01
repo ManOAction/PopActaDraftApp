@@ -196,9 +196,21 @@ code in `api/src/popacta/domain/` — it locks the decisions that otherwise dive
 - Your roster and its unfilled needs
 - **Picks until your next turn** — the keystone the whole decision engine hangs off
 
-**Wave 0 done (2026-07-31):** Sleeper league/draft payloads pinned as test fixtures;
-`positions.py` and `league.py` implemented and tested against them; `snake.py`, `draft.py`,
-`roster.py` and `errors.py` written as signatures for parallel implementation.
+**Phase 1 complete (2026-07-31).** Built in four waves — contracts single-authored, then
+three modules implemented concurrently by independent agents, then adversarial verification
+and cross-module integration. **903 tests**, lint and format clean.
+
+- Wave 0: Sleeper payloads pinned as fixtures; `positions.py`, `league.py`, `errors.py`;
+  signatures for the rest
+- Wave 1: `snake.py`, `roster.py`, `draft.py` implemented in parallel against those
+  signatures
+- Wave 2: adversarial verification (no arithmetic defects; nine input-validation holes,
+  all fixed) and a full 160-pick integration suite
+
+The keystone was verified against an independently constructed board across all 10 seats ×
+161 draft states with zero mismatches, and roster matching against a bitmask-DP oracle
+across 30,000 random cases. Known limitations to carry into Phase 2 are listed in
+[`plan_phase1_domain_core.md`](plan_phase1_domain_core.md).
 
 ### Phase 2 — Decision engine *(~4 days)*
 

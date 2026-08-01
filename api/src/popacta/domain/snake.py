@@ -1,11 +1,11 @@
 """Snake draft order and pick arithmetic.
 
-SIGNATURES ONLY — implemented by wave 1, agent A. See `docs/plan_phase1_domain_core.md`.
-
 Everything here is 1-based: seats `1..teams`, rounds `1..rounds`, picks `1..teams*rounds`.
 The 2025 app never modelled snake order at all — `total_teams` was used only as
 picks-per-round (LEG-3).
 """
+
+from popacta.domain.errors import DraftRangeError
 
 __all__ = [
     "next_pick_for_seat",
@@ -14,6 +14,50 @@ __all__ = [
     "round_and_seat",
     "seat_picks",
 ]
+
+
+def _check_teams(teams: int) -> None:
+    if teams < 1:
+        raise DraftRangeError(f"teams must be at least 1, got {teams}")
+
+
+def _check_rounds(rounds: int) -> None:
+    if rounds < 1:
+        raise DraftRangeError(f"rounds must be at least 1, got {rounds}")
+
+
+def _check_seat(seat: int, teams: int) -> None:
+    if not 1 <= seat <= teams:
+        raise DraftRangeError(f"seat {seat} outside 1..{teams}")
+
+
+def _check_reversal_round(reversal_round: int, rounds: int | None = None) -> None:
+    """Reject a `reversal_round` that could never take effect.
+
+    `_descends` would quietly treat a negative value, or one past the final round, as
+    plain snake — a config typo would then produce a wrong board with nothing raising.
+    These functions are public and Phase 2 calls them directly, so the check cannot live
+    only in `LeagueConfig`. `rounds` is omitted where the caller does not know it.
+    """
+    if reversal_round < 0:
+        raise DraftRangeError(f"reversal_round {reversal_round} is negative")
+    if rounds is not None and reversal_round > rounds:
+        raise DraftRangeError(
+            f"reversal_round {reversal_round} is past the last round ({rounds}); "
+            "it would never take effect"
+        )
+
+
+def _descends(round_: int, reversal_round: int) -> bool:
+    """True when `round_` runs from seat `teams` down to seat 1.
+
+    Plain snake: even rounds descend. A `reversal_round` of `r > 0` flips the direction
+    again from round `r` onward, so with `r = 3` rounds 2 and 3 both descend.
+    """
+    descending = round_ % 2 == 0
+    if reversal_round > 0 and round_ >= reversal_round:
+        descending = not descending
+    return descending
 
 
 def pick_number(round_: int, seat: int, teams: int, reversal_round: int = 0) -> int:
@@ -26,7 +70,14 @@ def pick_number(round_: int, seat: int, teams: int, reversal_round: int = 0) -> 
     Raises:
         DraftRangeError: `round_` or `seat` outside its valid range.
     """
-    raise NotImplementedError
+    _check_teams(teams)
+    _check_reversal_round(reversal_round)
+    if round_ < 1:
+        raise DraftRangeError(f"round {round_} below 1")
+    _check_seat(seat, teams)
+
+    offset = teams - seat + 1 if _descends(round_, reversal_round) else seat
+    return (round_ - 1) * teams + offset
 
 
 def round_and_seat(pick: int, teams: int, reversal_round: int = 0) -> tuple[int, int]:
@@ -35,7 +86,16 @@ def round_and_seat(pick: int, teams: int, reversal_round: int = 0) -> tuple[int,
     Raises:
         DraftRangeError: `pick` below 1.
     """
-    raise NotImplementedError
+    _check_teams(teams)
+    _check_reversal_round(reversal_round)
+    if pick < 1:
+        raise DraftRangeError(f"pick {pick} below 1")
+
+    # The one 0-based conversion in this module: `pick - 1` indexes the board.
+    round_ = (pick - 1) // teams + 1
+    offset = (pick - 1) % teams + 1
+    seat = teams - offset + 1 if _descends(round_, reversal_round) else offset
+    return round_, seat
 
 
 def seat_picks(seat: int, teams: int, rounds: int, reversal_round: int = 0) -> tuple[int, ...]:
@@ -47,7 +107,14 @@ def seat_picks(seat: int, teams: int, rounds: int, reversal_round: int = 0) -> t
     Raises:
         DraftRangeError: `seat` outside `1..teams`.
     """
-    raise NotImplementedError
+    _check_teams(teams)
+    _check_rounds(rounds)
+    _check_reversal_round(reversal_round, rounds)
+    _check_seat(seat, teams)
+
+    return tuple(
+        pick_number(round_, seat, teams, reversal_round) for round_ in range(1, rounds + 1)
+    )
 
 
 def next_pick_for_seat(
@@ -58,9 +125,26 @@ def next_pick_for_seat(
     Returns `None` once the seat has no picks left.
 
     Raises:
-        DraftRangeError: `seat` outside `1..teams`, or `picks_made` negative.
+        DraftRangeError: `seat` outside `1..teams`, or `picks_made` negative, or
+            `picks_made` greater than the `teams * rounds` picks the draft contains.
     """
-    raise NotImplementedError
+    _check_teams(teams)
+    _check_rounds(rounds)
+    _check_reversal_round(reversal_round, rounds)
+    _check_seat(seat, teams)
+    if picks_made < 0:
+        raise DraftRangeError(f"picks_made {picks_made} is negative")
+    total_picks = teams * rounds
+    if picks_made > total_picks:
+        raise DraftRangeError(
+            f"picks_made {picks_made} exceeds the {total_picks} picks in a "
+            f"{teams}-team, {rounds}-round draft"
+        )
+
+    for pick in seat_picks(seat, teams, rounds, reversal_round):
+        if pick > picks_made:
+            return pick
+    return None
 
 
 def picks_until_next_turn(
@@ -79,6 +163,10 @@ def picks_until_next_turn(
     Equivalent to `next_pick_for_seat(...) - picks_made - 1`.
 
     Raises:
-        DraftRangeError: `seat` outside `1..teams`, or `picks_made` negative.
+        DraftRangeError: `seat` outside `1..teams`, or `picks_made` negative, or
+            `picks_made` greater than the `teams * rounds` picks the draft contains.
     """
-    raise NotImplementedError
+    next_mine = next_pick_for_seat(seat, picks_made, teams, rounds, reversal_round)
+    if next_mine is None:
+        return None
+    return next_mine - picks_made - 1

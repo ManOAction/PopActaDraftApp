@@ -14,9 +14,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Self
 
+from popacta.domain.errors import LeagueConfigError
 from popacta.domain.positions import EXCLUDED_POSITIONS, Position
 
 BENCH_SLOT: Final[str] = "BN"
+SNAKE_DRAFT_TYPE: Final[str] = "snake"
 
 SLOT_ELIGIBILITY: Final[Mapping[str, frozenset[Position]]] = {
     "QB": frozenset({Position.QB}),
@@ -81,35 +83,60 @@ class LeagueConfig:
         value produces a silently truncated draft in which nothing crashes and every
         downstream number is wrong.
 
+        Every check here exists so that a league change surfaces days before the draft
+        rather than as a wrong number during it.
+
         Raises:
             KeyError: a required field is absent from either payload.
-            ValueError: a `roster_positions` entry is not a recognised slot name, or a
-                structural value is out of range.
+            LeagueConfigError: the draft is not a snake, a `roster_positions` entry is not
+                a recognised slot name, a structural value is out of range, or the two
+                payloads disagree about the number of teams.
         """
         roster_positions = league["roster_positions"]
         if not isinstance(roster_positions, Sequence) or isinstance(roster_positions, str):
-            raise ValueError(
+            raise LeagueConfigError(
                 f"roster_positions must be a list, got {type(roster_positions).__name__}"
+            )
+
+        draft_type = draft["type"]
+        if draft_type != SNAKE_DRAFT_TYPE:
+            # Every seat, roster and survival estimate in this app assumes snake order.
+            # An auction or linear draft would compute cleanly and be entirely wrong.
+            raise LeagueConfigError(
+                f"draft type is {draft_type!r}, expected {SNAKE_DRAFT_TYPE!r}; "
+                "this app's pick maths assumes a snake draft"
             )
 
         draft_settings = draft["settings"]
         teams = int(draft_settings["teams"])
         rounds = int(draft_settings["rounds"])
-        reversal_round = int(draft_settings.get("reversal_round", 0))
+        # Not `.get(..., 0)`. A missing reversal_round is a payload shape change, and
+        # defaulting it would silently draft rounds 3-16 against a board that never existed.
+        reversal_round = int(draft_settings["reversal_round"])
 
         if teams < 2:
-            raise ValueError(f"teams must be at least 2, got {teams}")
+            raise LeagueConfigError(f"teams must be at least 2, got {teams}")
         if rounds < 1:
-            raise ValueError(f"rounds must be at least 1, got {rounds}")
+            raise LeagueConfigError(f"rounds must be at least 1, got {rounds}")
         if not 0 <= reversal_round <= rounds:
-            raise ValueError(f"reversal_round {reversal_round} outside 0..{rounds}")
+            raise LeagueConfigError(f"reversal_round {reversal_round} outside 0..{rounds}")
+
+        # Cross-checking the two payloads is the reason this method takes both. The league
+        # object independently reports the roster count; if they ever disagree, one of them
+        # is describing a different league and we must not pick a winner silently.
+        rosters = league.get("total_rosters")
+        if rosters is not None and int(rosters) != teams:
+            raise LeagueConfigError(
+                f"league reports {int(rosters)} rosters but draft reports {teams} teams; "
+                "refusing to guess which is authoritative"
+            )
 
         starter_slots, bench_count = _parse_roster_positions(roster_positions)
 
         if any(slot.name == "K" for slot in starter_slots):
             # The strategy assumes no kicker slot exists. If one appears, the league
             # changed and the roster model needs revisiting — do not silently absorb it.
-            raise ValueError(
+            raise LeagueConfigError(
                 "league now has a K slot; kickers are excluded from this app "
                 "(see docs/plan_phase1_domain_core.md, decision 1)"
             )
@@ -148,8 +175,8 @@ def _parse_roster_positions(
     Repeated names become distinct instances: `["RB", "RB"]` -> `RB.1`, `RB.2`.
 
     Raises:
-        ValueError: on any slot name not in `SLOT_ELIGIBILITY` (and not `BN`). Failing
-            loudly here is the point — an unrecognised slot silently dropped would
+        LeagueConfigError: on any slot name not in `SLOT_ELIGIBILITY` (and not `BN`).
+            Failing loudly here is the point — an unrecognised slot silently dropped would
             corrupt the replacement baseline exactly the way LEG-1 did.
     """
     slots: list[SlotInstance] = []
@@ -165,7 +192,7 @@ def _parse_roster_positions(
 
         eligible = SLOT_ELIGIBILITY.get(name)
         if eligible is None:
-            raise ValueError(
+            raise LeagueConfigError(
                 f"unrecognised roster slot {name!r} at roster_positions[{index}]; "
                 f"known slots are {sorted(SLOT_ELIGIBILITY)} plus {BENCH_SLOT!r}"
             )
