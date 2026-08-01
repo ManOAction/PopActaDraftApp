@@ -38,9 +38,15 @@ variance**; neither is recoverable from these columns.
 **What to pull:** same Half PPR + Superflex ("OP") settings, but the export variant that carries
 **`Best / Worst / Avg / Std Dev / ADP`**.
 
-**Usable today, without the re-pull:** `RK` gives a superflex consensus ordering, `TIERS` and
-`BYE` are complete (0 missing across all 768 rows), and `POS` carries positional rank. **Bye weeks
-can be imported from this file now** — that closes the LEG-4 gap independently of the ADP problem.
+**Usable today, without the re-pull:** `RK` gives a superflex consensus ordering, `TIERS` is
+complete on all 768 rows, and `POS` carries positional rank. **Bye weeks can be imported from
+this file now** — that closes the LEG-4 gap independently of the ADP problem.
+
+**Correction (2026-07-31):** an earlier version of this entry claimed `BYE` was also complete on
+all 768 rows. It is not — `BYE` is the literal `'-'` on **125 rows**, starting at `RK 200`
+(`Stefon Diggs`). Every affected row is ranked 200 or worse, i.e. outside the 160-pick draftable
+window, so bye weeks are complete for every player who can actually be drafted and the conclusion
+above still holds. Detail in [reference_fantasypros_exports.md](reference_fantasypros_exports.md).
 
 **The missing DST and K rows turned out not to matter.** This export covers QB (63), RB (242),
 WR (294), TE (169) only. That is now exactly the universe this app ranks — see BLK-2, closed by

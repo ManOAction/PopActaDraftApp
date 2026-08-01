@@ -116,8 +116,25 @@ files too — `QB ∪ FLX` covers all 518 QB/RB/WR/TE players, so **the projecti
 `data/fantasypros/` is complete for our purposes.** No supplementary export is needed.
 
 What *is* good in the superflex file: `RK` as a consensus superflex ordering, positional rank
-inside `POS`, and **`TIERS` and `BYE` complete on all 768 rows** — enough to import bye weeks
-today and close the LEG-4 gap without waiting on the ADP re-pull.
+inside `POS`, and **`TIERS` complete on all 768 rows**.
+
+> **Correction (2026-07-31).** This section previously claimed `BYE` was complete on all 768
+> rows. **It is not.** `BYE` is the literal string `'-'` on **125 rows**, beginning at `RK 200`
+> (`Stefon Diggs`) — free agents and unsigned players. `int(row["BYE"])` raises on row 200.
+>
+> Raising is the *correct* behaviour under the fail-loudly rule, so the importer needs no
+> special casing — but it must not be surprised by it, and this doc must not promise otherwise.
+> All 125 affected rows are ranked 200 or worse, i.e. outside the 160-pick draftable window, so
+> bye weeks **are** complete for every player who can actually be drafted. Treat `'-'` as
+> "unrostered, no bye" and reject it only for a player inside the draftable window.
+
+Two further parsing notes for this file specifically:
+
+- It has **no junk spacer row** — that trap belongs to the *projections* exports. All 768 rows
+  are real. The `utf-8-sig` and quoted-thousands-separator traps still apply.
+- **`RK` is a dense 1..768 sequence with no gaps**, so every consecutive difference is exactly 1.
+  That makes rank useless as a clustering axis — there are no gaps in it to find. Cluster on
+  projected points instead. See `docs/plan_phase2_decision_engine.md`.
 
 ## Why not the FantasyPros API
 

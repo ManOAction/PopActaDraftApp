@@ -25,7 +25,14 @@
       "PowerShell(git -C c:/Projects/PopActaDraftApp diff --stat -- api/src/popacta/domain/draft.py)",
       "Bash(uv run --project api python -c ' *)",
       "Bash(export PYTHONPATH=\"C:/Users/jacob/AppData/Local/Temp/claude/c--Projects-PopActaDraftApp/84f549d1-aee4-421f-912d-c55e297dd0c6/scratchpad\")",
-      "Bash(MUTATION=greedy uv run --project api pytest api/tests/domain/test_roster.py -p mutate)"
+      "Bash(MUTATION=greedy uv run --project api pytest api/tests/domain/test_roster.py -p mutate)",
+      "Bash(curl -sS \"https://api.github.com/repos/astral-sh/setup-uv/tags?per_page=100\")",
+      "Bash(python -c ' *)",
+      "Bash(uv run --project api python -c 'import sys; print\\(sys.version\\) *)",
+      "Bash(PYTHONIOENCODING=utf-8 uv run --project api python \"C:\\\\Users\\\\jacob\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Projects-PopActaDraftApp\\\\84f549d1-aee4-421f-912d-c55e297dd0c6\\\\scratchpad\\\\match.py\")",
+      "Bash(PYTHONIOENCODING=utf-8 uv run --project api python \"C:\\\\Users\\\\jacob\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Projects-PopActaDraftApp\\\\84f549d1-aee4-421f-912d-c55e297dd0c6\\\\scratchpad\\\\followup.py\")",
+      "Bash(PYTHONIOENCODING=utf-8 uv run --project api python \"C:\\\\Users\\\\jacob\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Projects-PopActaDraftApp\\\\84f549d1-aee4-421f-912d-c55e297dd0c6\\\\scratchpad\\\\final.py\")",
+      "Bash(PYTHONIOENCODING=utf-8 uv run --project api python -c ' *)"
     ]
   }
 }
