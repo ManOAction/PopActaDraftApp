@@ -1,7 +1,5 @@
 """Recomputing fantasy points from raw stats using the league's own scoring settings.
 
-SIGNATURES ONLY — wave 1.
-
 **Recompute rather than read the CSV's `FPTS` column.** Verified 2026-07-31: the league's
 offensive scoring is identical to FantasyPros' default Half PPR — recomputation reproduces
 their `FPTS` across all 518 players, max deviation 0.62 points, all of it rounding. So this
@@ -16,6 +14,8 @@ hand-entered — hardcoding them is what broke the 2025 app.
 """
 
 from collections.abc import Mapping
+
+from popacta.domain.errors import ImportDataError
 
 __all__ = ["fantasy_points"]
 
@@ -44,4 +44,15 @@ def fantasy_points(stats: Mapping[str, float], scoring: Mapping[str, float]) -> 
         function does not model it. That is fine — defenses are streamed and never ranked
         (BLK-2) — but do not extend this function to DST without revisiting that decision.
     """
-    raise NotImplementedError
+    total = 0.0
+    for stat, value in stats.items():
+        # Not `scoring.get(stat, 0.0)`. A stat with no rule is a stat we would be
+        # silently discarding, and a discarded stat is a projection that is quietly too
+        # low for every player who accumulates it.
+        if stat not in scoring:
+            raise ImportDataError(
+                f"stat {stat!r} (value {value!r}) has no scoring rule in the league's "
+                f"scoring_settings; known rules: {sorted(scoring)}"
+            )
+        total += value * scoring[stat]
+    return total

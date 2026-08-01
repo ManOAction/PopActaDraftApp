@@ -208,11 +208,30 @@ Settled empirically against FantasyPros' own `TIERS` labels (768 rows):
 - Ties (`gap == threshold`) break the tier — `>=`, stated explicitly.
 
 **Why the simplest algorithm wins:** it scores slightly *worse* than Jenks on agreement (ARI 0.336
-vs 0.392, ceiling 0.446) and decisively better on stability. Under single-player removal it
-produces **zero** non-local boundary changes — verified independently — while Jenks moves
+vs 0.392, ceiling 0.446) and decisively better on stability. Under single-player removal the **gap
+rule** produces **zero** non-local boundary changes — verified independently — while Jenks moves
 boundaries up to 37 positions away and largest-N-gaps up to 99. Mid-draft, one pick shifting a tier
 line 65 positions away is what makes a tier display worse than none. Recompute every pick; it is
 safe precisely because the estimator is local.
+
+> **Corrected 2026-08-01 — the zero-change guarantee belongs to the gap rule, not to
+> `min_tier_size`.** This section originally claimed zero non-local changes outright. That holds
+> for `min_tier_size = 1`; the merge pass is a downward-accumulating scan and does perturb distant
+> boundaries. Measured on the real board at `t = 6.0, min_tier_size = 2`:
+>
+> | position | removals perturbing a distant boundary | worst distance |
+> | --- | --- | --- |
+> | QB (82) | 8 | 7 positions |
+> | RB (128) | 6 | 3 |
+> | WR (189) | 5 | 5 |
+> | TE (119) | 3 | 3 |
+>
+> Independently reproduced on synthetic boards: 17 non-local changes at `t = 6.0, n = 40`, worst
+> distance 3. **Bounded and near** — against 37 for Jenks and 99 for largest-N — so the design
+> choice stands and `min_tier_size = 2` is kept. But the claim must be scoped, not asserted, and
+> the degenerate case is an all-singleton board, where a removal flips parity for everything below
+> it. Pinned by a test that asserts the merge pass is *not* zero-change, so this cannot be quietly
+> re-claimed later.
 
 ### 10. Lineup assignment uses a bitmask DP, not greedy
 
@@ -306,22 +325,28 @@ shared vocabulary, and three agents inventing their own would not compose.
 **Everywhere:** bad input raises; no silent defaults; every exception names the offending value.
 
 - **`scoring.py` / `ingest`** — recomputed `FPTS` matches the CSV within rounding across all 518
-  players. Column access keyed by index, with a test that would catch the WR rushing/receiving
-  swap in `FLX.csv`. `BYE == '-'` raises only for a player inside the draftable window.
+  players. **That test does not cover the column-order trap** — the swap is points-invisible in
+  this league (`rush_yd == rec_yd`, `rush_td == rec_td`), verified 2026-08-01, so a **stat-line**
+  comparison against the per-position files is the test that actually catches it. Column access
+  keyed by index. `BYE == '-'` raises only for a player inside the draftable window.
 - **`matching.py`** — ≥99% of rows resolve; the unresolved set is **exactly** the committed
   override list; **any** ambiguity after the full tie-break ladder raises; two FantasyPros rows
   resolving to one Sleeper ID raises. `DEF` picks resolve **by ID before any name path**, because
   all 32 Sleeper DEF rows have `full_name: null` and would otherwise raise `AttributeError`
   mid-draft.
-- **`replacement.py`** — `D_QB == 29` on the pinned data; both bases computed; `D_pos` from the
+- **`replacement.py`** — `D_QB == 32` on the pinned data (**corrected 2026-08-01**; this line said
+  29, the consensus-derived estimate, while the dated note under decision 2 already said 32 from
+  real ADP); both bases computed; `D_pos` from the
   league-wide allocation never exceeds draft demand.
 - **`lineup.py`** — matches a brute-force oracle over randomised rosters, **including randomised
   slot orders**. That reordered-slot test is the only thing standing between us and a 397-point
   error, exactly as in `test_roster.py`. Two QBs occupy `QB` and `SUPER_FLEX`; an RB never takes
   `SUPER_FLEX` while RB or FLEX is free.
-- **`tiers.py`** — zero non-local boundary changes under single-player removal, at every threshold.
-  Points and VORP produce identical per-position partitions (they differ by a constant) — assert
-  it, so nobody "fixes" it later.
+- **`tiers.py`** — **the gap rule** (`min_tier_size = 1`) produces zero non-local boundary changes
+  under single-player removal, at every threshold. The `min_tier_size` merge pass does not, and is
+  instead bounded: assert it stays local to within a few positions, and pin that it is non-zero so
+  the guarantee cannot be over-claimed. Points and VORP produce identical per-position partitions
+  (they differ by a constant) — assert it, so nobody "fixes" it later.
 - **`survival.py`** — `k == 0` returns exactly `1.0`; `erfc` path survives z ≥ 30 without `nan`;
   a faller past ADP returns a small positive number, not zero; `sd == 0` or missing raises at
   import; a drafted player raises.

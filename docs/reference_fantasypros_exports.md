@@ -38,9 +38,24 @@ FLX.csv  "Player","Team","POS","ATT","YDS","TDS","REC","YDS","TDS","FL","FPTS"  
 ```
 
 A parser keyed on column *names* silently swaps rushing and receiving for every WR in `FLX.csv`.
-It does not crash. It just produces wrong projections.
+It does not crash. It just produces wrong stat lines.
 
 **Key on `(file, column index)`, never on header name.**
+
+> ### The `FPTS`-agreement test cannot catch this. Verified 2026-08-01.
+>
+> This section previously said a name-keyed parser "produces wrong projections". It produces
+> wrong **stat lines** — and in *this* league the points come out **identical**, because
+> `rush_yd == rec_yd == 0.1` and `rush_td == rec_td == 6`, while `rec` (0.5) and `rush_att`
+> (unscored) keep their positions. A swapped line and a correct line both score 176.0.
+>
+> So the natural headline test — "recomputed points match published `FPTS` for all 518 players" —
+> passes with the bug in place. It was confirmed empirically: deliberately introducing the swap
+> failed five stat-line tests and left the `FPTS` test green.
+>
+> **Only a stat-line comparison catches the column-order trap.** Compare `FLX.csv` against the
+> per-position files field by field. A points check is necessary but not sufficient, and leading
+> with it gives false confidence.
 
 Verified layouts:
 
