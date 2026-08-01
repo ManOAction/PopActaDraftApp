@@ -68,6 +68,14 @@ Deliberately deferred to the off-season, listed so they stay deferred:
 - The nflverse ingestion pipeline; ELO / strength-of-schedule as projection features
 - Multi-user, auth, shared draft rooms
 - Dynasty/keeper mechanics
+- **User-configurable modelling choices.** Phase 2 freezes eight modelling decisions as named
+  constants — replacement basis, tier threshold, survival distribution, lookahead depth, bench
+  weight and others. Several get ground-truthed for the first time at the mock-draft rehearsal
+  (OPEN-2), so exposing them as settings is a plausible off-season feature. They are deliberately
+  given named homes now so this becomes a settings surface rather than a refactor. Full table in
+  [`plan_phase2_decision_engine.md`](plan_phase2_decision_engine.md#configurable-in-a-later-cycle).
+  **Constraint:** a knob may change model *inputs*, never add a term to the score — "each signal
+  enters exactly once" is what keeps the recommendation explainable, and that is not negotiable.
 
 `scripts/` (NFL scraper + ELO + division strength) **moved to `analytics/` and is parked**
 (done 2026-07-31) — not deleted, not worked on. It analyses team outcomes; the copilot needs
@@ -217,11 +225,32 @@ across 30,000 random cases. Known limitations to carry into Phase 2 are listed i
 Also pure and independently verifiable, which makes it the right place to practise adversarial
 sub-agent review.
 
+**Full contracts, formulas, module ownership and acceptance criteria:
+[`plan_phase2_decision_engine.md`](plan_phase2_decision_engine.md).** Read it before writing any
+Phase 2 code.
+
 - VORP rebuilt against the next-pick-window baseline, with **superflex-aware** positional demand
-  (QB demand is 10 QB slots + contested share of 10 SUPER_FLEX slots, not a flat count)
 - **Survival probability**: given ADP and its variance, will this player last until my next turn?
 - Tier detection (gap-based clustering) — see the cliff before you fall off it
 - Positional run detection
+
+**Research complete (2026-08-01)** — four parallel passes, each independently verified. Two found
+errors in existing docs: the `VONA` formula in
+[`FeatureDescription_PickAdvisor.md`](FeatureDescription_PickAdvisor.md) **ranked backwards** (the
+baseline must be added, not subtracted), and `BYE` was not complete in the rankings export.
+
+Three findings that shaped the plan:
+
+- **The SUPER_FLEX slot is not contested** — all 10 go to QBs, decided by 110 points. "Contested
+  share" is 100% QB, robustly.
+- **Replacement level uses draft demand** (`QB30`, not `QB21`) — decided 2026-08-01. 29 QBs come
+  off the board in 160 picks, so punting QB gets you QB30, not a projected 493-attempt starter.
+- **Greedy is exact only for Sleeper's slot order** and 397 points wrong under any other. The
+  weighted lineup assignment uses a bitmask DP. Third occurrence of this pattern in the project.
+
+**Partly blocked by BLK-1.** Projection import, replacement levels, the lineup DP and tier
+detection are all buildable today; survival probability and the `Plan` assembly are not. Interim
+degraded mode: rank on `u(p | R)` alone — classic VORP with the correct baseline.
 
 ### Phase 3 — UI *(~6 days)*
 
