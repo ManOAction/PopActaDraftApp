@@ -1,6 +1,7 @@
 """Survival probability: will this player still be there when I pick again?
 
-NOT YET IMPLEMENTED — blocked on BLK-1 (`Std Dev`). See `docs/plan_phase2_decision_engine.md`, decision 8.
+NOT YET IMPLEMENTED — blocked on BLK-1 (`Std Dev`).
+See `docs/plan_phase2_decision_engine.md`, decision 8.
 
 The model is a **conditional** normal survival ratio, floored by a constant hazard:
 
