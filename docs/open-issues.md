@@ -14,7 +14,7 @@ reproducing.
 
 | ID | Issue | Blocks | Owner |
 | --- | --- | --- | --- |
-| BLK-1 | **ADP solved 2026-08-01; `Std Dev` still missing.** See below. | Survival probability only — tiers, bye weeks and replacement levels are now unblocked | Jacob |
+| BLK-1 | **`Std Dev` source not identified.** ADP itself was solved 2026-08-01. Blocks *only* survival probability and the `Plan` assembly; the interim `u(p \| R)` board needs neither. See below. | `survival.py`, `advisor.Plan` | Jacob |
 | BLK-3 | **Draft slot unknown.** Sleeper's `draft_order` is not yet populated for draft `1385689586394488832`. | Next-pick math uses a placeholder until set | Sleeper |
 
 ### BLK-1 update, 2026-08-01 — ADP landed, dispersion did not
@@ -82,6 +82,34 @@ decision. No supplementary export is needed.
 | OPEN-2 | **Draft-day rehearsal not scheduled.** A full mock draft end-to-end is the only real test of Sleeper polling. | **High** | Must happen with days of margin before 2026-08-28, not the night before. |
 | OPEN-3 | ADP moves through August; a stale export produces wrong survival estimates. | Medium | Import must be re-runnable. Re-pull within a few days of the draft. |
 | OPEN-4 | No decision on how manual pick entry and Sleeper auto-sync reconcile when they disagree. | Medium | Needs an answer before Phase 3. Last-write-wins is probably wrong. |
+| OPEN-5 | **Uncapped draft demand produces a degenerate board.** Deferred 2026-08-01 in favour of end-to-end testing. | **High** — but not blocking | See below. |
+
+### OPEN-5 detail — the replacement-level cap
+
+Draft demand sets `r_pos` to the `(D+1)`-th best player. Real superflex ADP gives `D_QB = 32`, so
+`r_QB = QB33`. Measured consequence:
+
+| basis | `r_QB` | top-16 board |
+| --- | --- | --- |
+| `D_QB = 29` (consensus-derived — what the decision was made on) | QB30 = 192.7 | **1 QB**, #1 Gibbs (RB) |
+| `D_QB = 32` (real ADP) | QB33 = 108.9 | **12 QBs**, #1 Allen (QB) +263.3 |
+| starter demand (rejected) | QB21 = 269.6 | 1 QB, #1 Gibbs (RB) |
+
+The middle row reproduces the exact board the Phase 2 research independently flagged as degenerate
+("+263, QBs at 1, 3, 5–16"). **The cause is a projection cliff, not a modelling error:** the market
+drafts 32 QBs, but FantasyPros projects only 29 at starter volume. QB33 is a backup at 238 pass
+attempts. Draft demand asks *"what am I stuck with if I punt?"*, which assumes the `(D+1)`-th player
+is startable; here it measures the end of the projection list instead.
+
+**Proposed fix (one line in `replacement_levels`):** cap the baseline at the startable cliff —
+`r_pos` = the `(D+1)`-th best player **or** the last player projected for starter-level usage,
+whichever is better. Self-correcting: for RB/WR/TE the cliff sits well past demand, so nothing
+changes there.
+
+**Why it is safe to defer:** the interim board ranks on `u(p | R)` alone, and the cap changes only
+the *magnitude* of `r_QB`, not the plumbing. Decide it against a real board during the mock-draft
+rehearsal (OPEN-2) — which is a better test than any amount of further analysis. The uncapped
+board is visibly wrong, so this will not slip silently.
 
 ---
 
