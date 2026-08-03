@@ -32,7 +32,12 @@ from popacta.domain.positions import RANKED_POSITIONS, Position
 # caller, and duplicating the recursion is how the two copies drift apart.
 from popacta.domain.roster import _augment
 
-__all__ = ["draft_demand", "replacement_levels", "starter_demand"]
+__all__ = [
+    "consensus_draft_demand",
+    "draft_demand",
+    "replacement_levels",
+    "starter_demand",
+]
 
 _RANKED_ORDER: Final[tuple[Position, ...]] = tuple(p for p in Position if p in RANKED_POSITIONS)
 """`RANKED_POSITIONS` in declaration order, so every result mapping iterates identically.
@@ -83,6 +88,47 @@ def draft_demand(pool: Sequence[Player], config: LeagueConfig) -> Mapping[Positi
             )
         counts[player.position] += 1
 
+    return MappingProxyType(counts)
+
+
+def consensus_draft_demand(
+    pool_in_consensus_order: Sequence[Player], config: LeagueConfig
+) -> Mapping[Position, int]:
+    """Draft demand counted from **consensus rank order** rather than from ADP.
+
+    The documented ADP-free fallback. `draft_demand` needs an `AdpEstimate` on every player
+    inside the window, and `AdpEstimate` needs a standard deviation that no FantasyPros
+    export currently supplies (BLK-1) — so until that lands, this is how replacement levels
+    get computed.
+
+    It is not merely a stopgap. Consensus order yields `D_QB = 29` where real ADP yields 32,
+    and 29 is the number that produces a sane board: `r_QB = QB30 = 192.7` rather than
+    `QB33 = 108.9`. The gap is a projection cliff — the market drafts 32 QBs but only ~29 are
+    projected at starter volume — which is exactly OPEN-5. **Using this fallback sidesteps
+    OPEN-5 rather than papering over it**, and the cap proposed there should be applied to
+    both functions when it is settled.
+
+    Args:
+        pool_in_consensus_order: ranked players, **already sorted** by consensus overall
+            rank, best first. Order is the entire signal here, so an unsorted pool silently
+            produces nonsense — the caller owns that and this function cannot check it.
+        config: supplies `teams * rounds`.
+
+    Raises:
+        ImportDataError: the pool holds fewer ranked players than the draft has picks, which
+            would understate every position and lift every replacement level.
+    """
+    ranked = _ranked_players(pool_in_consensus_order)
+
+    if len(ranked) < config.total_picks:
+        raise ImportDataError(
+            f"player pool holds only {len(ranked)} ranked players but the draft makes "
+            f"{config.total_picks} picks; the pool is truncated and demand would be understated"
+        )
+
+    counts = dict.fromkeys(_RANKED_ORDER, 0)
+    for player in ranked[: config.total_picks]:
+        counts[player.position] += 1
     return MappingProxyType(counts)
 
 
