@@ -1,6 +1,6 @@
 """The recommendation: who should I take?
 
-SIGNATURES ONLY — **wave 2, single-authored.** This is the assembly point, and it is where
+The assembly point, single-authored. This is where
 double-counting would creep in. See `docs/plan_phase2_decision_engine.md`, decisions 3-7
 and 11.
 
@@ -27,10 +27,14 @@ terms. Applying survival again as a multiplier on the final score would count it
 that is LEG-5's mistake in a new costume.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from popacta.domain.errors import InvalidPlayerError
+from popacta.domain.league import SlotInstance
+from popacta.domain.lineup import marginal_value
 from popacta.domain.players import Player
+from popacta.domain.positions import Position
 
 __all__ = ["Recommendation", "recommend"]
 
@@ -62,34 +66,60 @@ class Recommendation:
 def recommend(
     available: Sequence[Player],
     roster: Sequence[Player],
-    picks_made: int,
-    picks_until_turn: int | None,
+    slots: Sequence[SlotInstance],
+    replacement: Mapping[Position, float],
     *,
+    picks_until_turn: int | None = None,
     top_n: int = 40,
 ) -> tuple[Recommendation, ...]:
     """Rank the board, best first.
 
-    Args:
-        picks_until_turn: `k`, from `snake.picks_until_next_turn(seat, picks_made + 1, …)`.
-            `None` at your final pick.
+    **Degraded mode is what runs today.** `survival()` is blocked on BLK-1 (no `Std Dev`
+    source), so `picks_until_turn` is currently always `None` in practice, `B(p)` is `0`,
+    and `Plan(p)` collapses to `u(p | R)` — classic VORP against the correct replacement
+    level. That is a genuinely useful board, not a stub: it is strictly better than
+    anything the 2025 app produced, and it exercises every module except survival.
 
-    Behaviour that must not be special-cased away:
-        - **`picks_until_turn is None`** (final pick): `B(p) = 0`, so `Plan(p) = u(p | R)`.
-          "An empty window has expectation zero" is the whole rule — no branch needed.
-        - **`k == 0`** (at the turn, picking back-to-back): every survival is exactly 1.0
-          and the 2-ply model is indifferent between your two picks, which is correct but
-          useless. Extend one ply using `snake.picks_until_nth_turn(..., n=2)`.
-        - **No ADP available** (BLK-1): fall back to ranking on `u(p | R)` alone — classic
-          VORP with the correct replacement level. Label it in the UI. It is a genuinely
-          useful board, not a stub, and it exercises everything except the survival path.
+    `cost_of_passing` remains meaningful in this mode — it is the gap to the best
+    alternative, which is exactly the question "what do I give up by not taking him".
+
+    Args:
+        available: ranked players still on the board, from `PlayerPool.available()`.
+        roster: your players, **already filtered to `RANKED_POSITIONS`**. A `DEF` reaching
+            `lineup` raises, which is the intended guard, not something to work around.
+        slots: normally `config.ranked_starter_slots`.
+        replacement: `r_pos`, from `replacement.replacement_levels`.
+        picks_until_turn: `k`. `None` at your final pick **and** whenever survival is
+            unavailable. Both mean the same thing here: an empty window has expectation
+            zero, so no branch is needed.
+        top_n: how many rows to return. The UI shows a board, not 488 rows.
 
     Raises:
-        InvalidPlayerError: a player in `available` is already in `roster`.
-
-    Note:
-        Assert `|sum(1 - s) - k| <= 0.15 * k` over the available pool and **fail loudly**.
-        The expected number of players taken in the window must equal `k` by construction,
-        so this is the cheapest available detector of a miscalibrated `sd` or a stale
-        export. Synthetic data already runs 2-9% hot.
+        InvalidPlayerError: a player appears in both `available` and `roster`.
     """
-    raise NotImplementedError
+    rostered = {p.player_id for p in roster}
+    overlap = sorted(rostered & {p.player_id for p in available})
+    if overlap:
+        raise InvalidPlayerError(
+            f"{len(overlap)} player(s) are both available and on the roster: {overlap[:5]}; "
+            "the board is out of sync with the draft state"
+        )
+
+    # `B(p)` is zero without survival probability, so `Plan(p) == u(p | R)`. When BLK-1
+    # lands this is the single place the baseline gets added — see decision 3.
+    scored = [(player, marginal_value(player, roster, slots, replacement)) for player in available]
+    scored.sort(key=lambda pair: (-pair[1], pair[0].name))
+
+    best = scored[0][1] if scored else 0.0
+    return tuple(
+        Recommendation(
+            player=player,
+            marginal_value=value,
+            next_turn_baseline=0.0,
+            plan=value,
+            cost_of_passing=best - value,
+            survival=None,
+            slot_filled=None,
+        )
+        for player, value in scored[:top_n]
+    )
